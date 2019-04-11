@@ -9,7 +9,9 @@ It was created and is maintained by Florian and Dominique (see com-chain.org)
 The files in this api have the following purpose:
 
 Check the node is up:
+
 ├── ping.php
+
 ├── dbcheck.php
 
 Authentication and authorization:
