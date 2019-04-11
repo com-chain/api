@@ -15,28 +15,45 @@ Check the node is up:
 ├── dbcheck.php
 
 Authentication and authorization:
+
 ├── auth.php
+
 ├── checkAdmin.php
 
 Access the Blockchain Node:
+
 ├── api.php
 
 Access the DB node:
+
 ├── enroll.php       - used by the administration
+
 ├── getadd.php       - used by the administration
+
 ├── getuid.php       - used by the administration
+
 ├── trnslist.php     - to retrieve an index-based set of transactions
+
 ├── export.php       - to retrieve a time-based set of transaction 
 
+
 Access to the IPFS node:
+
 ├── ipfsadd.php
+
 ├── ipfscat.php
 
+
 Scripts:
+
 ├── parser.py         - for filling the DB from Blckchain Logs
+
 ├── update.sh         - for filling the DB from Blckchain Logs
+
 ├── webhook.py        - for sending whebhook
+
 ├── ReSendFailedWebhook.py
+
 
 Others files are helpers or library
 
