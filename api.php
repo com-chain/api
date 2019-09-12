@@ -18,6 +18,9 @@ if(isset($_REQUEST['balance'])){
 } else if(isset($_REQUEST['ethCall'])){
     header('Content-Type: application/json');
     echo getEthCall($_REQUEST['ethCall'],$gethRPC);
+}else if(isset($_REQUEST['ethCallAt']) && isset($_REQUEST['blockNb'])){
+    header('Content-Type: application/json');
+    echo getEthCallAt($_REQUEST['ethCallAt'],$_REQUEST['blockNb'],$gethRPC);
 } else if(isset($_REQUEST['hash'])){
     header('Content-Type: application/json');
     echo getTransaction($_REQUEST['hash'],$gethRPC);
@@ -85,6 +88,22 @@ function getEthCall($txobj, $gethRPC){
     }
     return json_encode($data);
 }
+
+
+function getEthCallAt($txobj, $blockNb, $gethRPC){
+    $data = getDefaultResponse();
+    try {
+        $data['data'] = getRPCResponse($gethRPC->eth_call($txobj,
+        $blockNb));
+    }
+    catch (exception $e) {
+        $data['error'] = true;
+        $data['msg'] = $e->getMessage();
+    }
+    return json_encode($data);
+}
+
+
 function getTransactionData($addr, $gethRPC){
     $data = getDefaultResponse();
     try {
