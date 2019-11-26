@@ -44,6 +44,7 @@ function personal_ecRecoverPublic($msg, $signed) {
     $personal_prefix_msg = "\x19Ethereum Signed Message:\n". strlen($msg). $msg;
     $hex = keccak256($personal_prefix_msg);
     return ecRecover($hex, $signed);
+}
     
 function ecRecoverPublic($hex, $signed) {
     $rHex   = substr($signed, 2, 64);
@@ -82,3 +83,5 @@ function strToHex($string)
 function keccak256($str) {
     return '0x'. Keccak::hash($str, 256);
 }
+
+?>

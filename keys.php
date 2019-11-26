@@ -1,5 +1,6 @@
 <?php
 require_once './Keccak.php';
+require_once './ecrecover_helper.php';
 use kornrunner\Keccak;
 
 header('Access-Control-Allow-Origin: *');
@@ -18,8 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input_obj = json_decode($_POST['data']);
     
     $input_sign = $_POST['sign'];
-    ec_recover_result = personal_ecRecoverPublic($input_data, $input_sign);
-    if (ec_recover_result[0] !== $input_obj->{'address'}){
+    $ec_recover_result = personal_ecRecoverPublic($input_data, $input_sign);
+    if ($ec_recover_result[0] !== $input_obj->{'address'}){
         // wrong signature
         exit("Bye!");
     }
@@ -32,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $query = "INSERT INTO keyStore (address, public_key, public_message_key, private_message_key) VALUES ('$address', '$main_public_key','$public_message_key', '$private_message_key')";
     $session->execute(new Cassandra\SimpleStatement($query));
-    echo '{"result":"OK"}';
+    echo '{"data":{"result":"OK"}}';
     
     
 } else {
@@ -51,9 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // get the data from the DB 
     $session = getDBSession();
      
-    $query = "SELECT public_key, public_message_key FROM keyStore WHERE address CONTAINS '$addr'"; 
+    $query = "SELECT public_key, public_message_key FROM keyStore WHERE address = '$addr'"; 
     if ($_GET['private']==1){
-        $query = "SELECT public_key, public_message_key, private_message_key FROM keyStore WHERE address CONTAINS '$addr'";
+        $query = "SELECT public_key, public_message_key, private_message_key FROM keyStore WHERE address = '$addr'";
     }
 
     // the address is a primary key it should be only 0 or 1 row
@@ -64,10 +65,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Return empty object if address not found
-    isset($string) or exit("[]");
+    isset($string) or exit('{"data":[]}');
 
     // return the keys
-    echo $string[0];
+    echo '{"data":'+$string[0]+'}';
 }
 
 
