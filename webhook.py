@@ -92,8 +92,8 @@ def buildWebhookMessage(transaction, server_name):
  
 def sendWebhook(url, message, transaction):
 
-    private_key_path =''
-    public_key_url ='https://...'
+    private_key_path ='../ComChain/comchainwebhook_rsa'
+    public_key_url ='https://com-chain.org/comchainwebhook_rsa.pub'
     
     json_message = json.dumps(message)
 
