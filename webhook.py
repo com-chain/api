@@ -45,7 +45,7 @@ def transmissionFailed(transaction_hash, attempt_number, max_attempt):
     
 def getWebhookInfo(store_id):
     session = openCassandraSession()
-    rows = session.execute("SELECT webhook_url, server_name FROM sellers WHERE store_id ='{}'".format(store_id))
+    rows = session.execute("SELECT webhook_url, server_name FROM sellers WHERE store_id ='{}'".format(store_id))
     for store_row in rows:
        return store_row['webhook_url'], store_row['server_name'] 
     return '',''

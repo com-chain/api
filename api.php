@@ -161,7 +161,7 @@ function validateShop( $shop_id, $server_name){
    $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")->build();
    $keyspace  = 'comchain';
    $session  = $cluster->connect($keyspace);
-   $query = "SELECT * FROM sellers  WHERE store_id = ? AND server_name = ? "; 
+   $query = "SELECT * FROM sellers WHERE store_id = ? AND server_name = ? "; 
    $options = array('arguments' => array($shop_id, $server_name)); 
    foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
 	 return true;
@@ -215,7 +215,7 @@ function storeAdditionalData($transaction_ash) {
         $fields['hash'] = $transaction_ash;
         $val[]='?';    
         // build the query
-        $query = "INSERT INTO webshop_transactions (".join(', ',array_keys($fields));
+        $query = "INSERT INTO webshop_transactions (".join(', ',array_keys($fields));
         $query = $query.') VALUES ('.join(', ',$val).')';
         
         $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("webhook_rw", "Private_access_transactions")->build();
@@ -230,11 +230,18 @@ function sendRawTransaction($rawtx,$gethRPC){
     $data = getDefaultResponse();
     try {
         $data['data'] = getRPCResponse($gethRPC->eth_sendRawTransaction($rawtx));
+    }
+    catch (exception $e) {
+        $data['error'] = true;
+        $data['msg'] = 'E1'.$e->getMessage();
+    }
+    
+    try {
         storeAdditionalData($data['data']);
     }
     catch (exception $e) {
         $data['error'] = true;
-        $data['msg'] = $e->getMessage();
+        $data['msg'] = 'E2'.$e->getMessage();
     }
     return json_encode($data);
 }
