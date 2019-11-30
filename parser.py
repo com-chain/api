@@ -169,30 +169,49 @@ for line in sys.stdin:
 	cqlInsertHash = "INSERT INTO trans_by_addr (hash, addr) VALUES ('{}', {})".format(transHash, addrJson)
 	print(cqlInsertHash)
 	session.execute(cqlInsertHash)
-	# Check if the transaction is in the webshop_transactions
-	cqlcommand = "SELECT hash, store_id, store_ref, delegate , toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
+	
+	# Check if the transaction is in the pending transaction table (webshop_transactions)
+	cqlcommand = "SELECT hash, store_id, store_ref, delegate , message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
 	rows = session.execute(cqlcommand)
+	additional_fields = [];
+	additional_values = [];
 	if len(rows)>0:
 	    row = rows[0]
-	    if 'store_id' in row: # this is a webshop transaction
-	        store_id = row['store_id']
-	        store_ref = row['store_ref']
-	        attempt_date = row['stamp']-10800000
 	    
-	        if 'delegate' in row: 
-	            # this is a delegated webshop transaction
-	            cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status, store_id, store_ref, tr_attempt_nb, tr_attempt_date, delegate) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 1,'{}','{}',0,{}) IF NOT EXISTS".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, store_id, store_ref, attempt_date, row['delegate'] )
+	    # message
+	    if 'message_from' in row:
+	         additional_fields.append('message_from')
+	         additional_values.append("'{}'".format(row['message_from'])) 
+	    
+	    if 'message_to' in row:
+	         additional_fields.append('message_to')
+	         additional_values.append("'{}'".format(row['message_to'])) 
+	         
+	    # delegate
+	    if 'delegate' in row:
+	         additional_fields.append('delegate')
+	         additional_values.append("'{}'".format(row['delegate'])) 
+	         
+	    # webshop
+	    if 'store_id' in row: # this is a webshop transaction
+	        additional_fields.append('store_id')
+	        additional_values.append("'{}'".format(row['store_id'])) 
+	        additional_fields.append('store_ref')
+	        additional_values.append("'{}'".format(row['store_ref'])) 
+	        additional_fields.append('status')
+	        additional_values.append("1") 
+	        additional_fields.append('tr_attempt_nb')
+	        additional_values.append("0") 
+	        additional_fields.append('tr_attempt_date')
+	        additional_values.append("'{}'".format(row['stamp']-10800000)) 
 	        
-	        else:
-	            # this is a webshop transaction without delegation
-	            cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status, store_id, store_ref, tr_attempt_nb, tr_attempt_date) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 1, '{}','{}',0) IF NOT EXISTS".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, store_id, store_ref, attempt_date)
-	            
-	    elif 'delegate' in row: 
-	        # this is a delegated transaction
-	        cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status, delegate) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 0, '{}')".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, row['delegate'])
-	else:
-	    #transaction not linked to a webshop nor delegated
-	    cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 0) IF NOT EXISTS".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo)
+	
+	add_fields ='status'
+	add_val ='0'
+	if len(additional_fields)>0
+	    add_fields = ', '.join(additional_fields)
+	    add_val =  ', '.join(additional_values)
+    cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, {}) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', {}) IF NOT EXISTS".format(add_fields,transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, add_val )
 	
 	print(cqlcommand)
 	session.execute(cqlcommand)

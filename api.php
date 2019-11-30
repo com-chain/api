@@ -50,8 +50,10 @@ function getTransaction($hash, $gethRPC){
                 ->build();
         $keyspace  = 'comchain';
         $session  = $cluster->connect($keyspace);
-        $query = "SELECT * FROM transactions WHERE hash = '$hash'";  
-	    foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
+        $query = "SELECT * FROM transactions WHERE hash = ?"; 
+        $options = array('arguments' => array($hash));
+
+	    foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
 	        $arr = $row;
 	    }
 	    
@@ -154,64 +156,81 @@ function getRPCResponse($result){
 }
 
 // Lookup into the DB for a valid shop from the REQUEST parameters
-// TODO PROTECT AGAINST CQL injection
+
 function validateShop( $shop_id, $server_name){
    $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")->build();
    $keyspace  = 'comchain';
    $session  = $cluster->connect($keyspace);
-   $query = "SELECT * FROM sellers  WHERE store_id = '$shop_id' AND server_name = '$server_name' ";  
-   foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
+   $query = "SELECT * FROM sellers  WHERE store_id = ? AND server_name = ? "; 
+   $options = array('arguments' => array($shop_id, $server_name)); 
+   foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
 	 return true;
    }
    
    return false;
 }
 
-// Insert Pending Shop transaction storing the shop_id and the shop_ref
-// TODO PROTECT AGAINST CQL injection
-function insertPendingShopTransaction($shop_id,$shop_ref,$transaction_ash,$delegate){
-   $field_add='';
-   $value_add='';
-   if (isset($delegate)){
-       $field_add=', delegate';
-       $value_add=", '$delegate'";
-   }
 
-//TODO change the table
-   $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("webhook_rw", "Private_access_transactions")->build();
-   $keyspace  = 'comchain';
-   $session  = $cluster->connect($keyspace);
-   $query = "INSERT INTO webshop_transactions (hash, store_id, store_ref, status, $field_add) VALUES ('$transaction_ash','$shop_id','$shop_ref' $value_add)";  // Set old timestamp for the lock (tr_attempt_date)
-}
 
-// Insert Pending Delegated transaction storing the delegate
-// TODO PROTECT AGAINST CQL injection
-function insertPendingDelegateTransaction($delegate,$transaction_ash){
-   $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("webhook_rw", "Private_access_transactions")->build();
-   $keyspace  = 'comchain';
-   $session  = $cluster->connect($keyspace);
-   //TODO change the table
-   $query = "INSERT INTO webshop_transactions (hash, delegate) VALUES ('$transaction_ash','$delegate')"; 
-}
-
-function sendRawTransaction($rawtx,$gethRPC){
+function validateShopData() {
     $shop_id=$_REQUEST['shopId'];
     $shop_ref=$_REQUEST['txId'];
     $server_name=$_REQUEST['serverName'];
-    $delegate=$_REQUEST['delegate'];
-    
- 
+    return (isset($shop_id) && isset($server_name) && isset($shop_ref) && validateShop( $shop_id, $server_name));
+}
 
+function storeAdditionalData($transaction_ash) {
+    $shop_id=$_REQUEST['shopId'];
+    $shop_ref=$_REQUEST['txId'];
+    $delegate=$_REQUEST['delegate'];
+    $memo_from=$_REQUEST['memo_from'];
+    $memo_to=$_REQUEST['memo_to'];
+    
+    $do_insert=false;
+    $fields =array();
+    $val =array();
+    if (validateShopData()) {
+        $fields['store_id'] = $shop_id;
+        $fields['store_ref'] = $shop_ref; 
+        $val[]='?';  
+        $val[]='?';      
+    }
+    
+    if (isset($delegate)) {
+        $fields['delegate'] = $delegate;
+        $val[]='?';    
+    }
+    
+    if (isset($memo_from) && $memo_from!="") {
+        $fields['message_from'] = $memo_from;
+        $val[]='?';    
+    }
+    
+    if (isset($memo_to) && $memo_to!="") {
+        $fields['message_to'] = $memo_to;
+        $val[]='?';    
+    }
+    
+    if (sizeof($fields)>0) {
+        $fields['hash'] = $transaction_ash;
+        $val[]='?';    
+        // build the query
+        $query = "INSERT INTO webshop_transactions (".join(', ',array_keys($fields));
+        $query = $query.') VALUES ('.join(', ',$val).')';
+        
+        $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("webhook_rw", "Private_access_transactions")->build();
+        $keyspace  = 'comchain';
+        $session  = $cluster->connect($keyspace);
+        $session->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
+    }
+}
+
+
+function sendRawTransaction($rawtx,$gethRPC){
     $data = getDefaultResponse();
     try {
         $data['data'] = getRPCResponse($gethRPC->eth_sendRawTransaction($rawtx));
-        
-        // If needed put the delegate and/or the Shop information into the DB as a pending transaction 
-        if (isset($shop_id) && isset($server_name) && isset($shop_ref) && validateShop( $shop_id, $server_name)){
-            insertPendingShopTransaction($shop_id,$shop_ref,$data['data'],$delegate);
-        } else if(isset($delegate)){
-            insertPendingDelegateTransaction($delegate, $data['data']);
-        }
+        storeAdditionalData($data['data']);
     }
     catch (exception $e) {
         $data['error'] = true;
@@ -219,6 +238,7 @@ function sendRawTransaction($rawtx,$gethRPC){
     }
     return json_encode($data);
 }
+
 function formatAddress($addr){
     if (substr($addr, 0, 2) == "0x")
         return $addr;

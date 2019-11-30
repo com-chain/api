@@ -32,9 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $private_message_key = str_replace("'","",$input_obj->{'private_message_key'});
 
     $session = getDBSession();
+    $query = "INSERT INTO keyStore (address, public_key, public_message_key, private_message_key) VALUES (?,?,?,?)";
+    $options = array('arguments' => array($address, $main_public_key,$public_message_key, $private_message_key));
     
-    $query = "INSERT INTO keyStore (address, public_key, public_message_key, private_message_key) VALUES ('$address', '$main_public_key','$public_message_key', '$private_message_key')";
-    $session->execute(new Cassandra\SimpleStatement($query));
+    $session->execute(new Cassandra\SimpleStatement($query), $options);
     echo '{"result":"OK"}';
     
     

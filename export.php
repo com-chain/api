@@ -33,10 +33,10 @@ $cluster  = Cassandra::cluster('127.0.0.1')
 $keyspace  = 'comchain';
 $session  = $cluster->connect($keyspace);
 
-$query = "SELECT * FROM transactions";
-$query = "SELECT hash from trans_by_addr WHERE addr CONTAINS '$addr'";
+$query = "SELECT hash from trans_by_addr WHERE addr CONTAINS ?";
+$options = array('arguments' => array($addr));
 $counter=0;
-foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
+foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
 $string[$counter] = implode(",",$row);
 $counter++;
 }

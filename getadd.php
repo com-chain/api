@@ -26,8 +26,9 @@ function getAddress($currency,$code){
     $table="Members";
       
     $results = "";    
-    $sql ="SELECT Adresses from $table where Code = '$code'";
-    foreach ($session->execute(new Cassandra\SimpleStatement($sql)) as $row) {
+    $sql ="SELECT Adresses from $table where Code = ?";
+    $options = array('arguments' => array($code));
+    foreach ($session->execute(new Cassandra\SimpleStatement($sql), $options) as $row) {
             
 	        $results = $row['adresses']; 
     }
