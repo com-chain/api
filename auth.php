@@ -1,88 +1,99 @@
 <?php
 require("includes/session.inc");
-session_start();
-session_regenerate_id(true);
-header('Access-Control-Allow-Origin: *');
 require_once 'libs/jsonRPCClient.php';
 
-$cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("challenges_rw", "Private_access_challenges")
-                ->build();
-$ml_cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("session_rw", "Private_access_sessions")
-                ->build();
+session_start();
+session_regenerate_id(true);
+
+header('Access-Control-Allow-Origin: *');
+
+// Build DB connection for the challenge
+$cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("challenges_rw", "Private_access_challenges")->build();
 $keyspace  = 'comchain';
 $session  = $cluster->connect($keyspace);
+
+// Build DB connection for the session
+$ml_cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("session_rw", "Private_access_sessions")->build();
 $ml_keyspace  = 'ml';
 $ml_session  = $ml_cluster->connect($ml_keyspace);
 
+// Build link to ethereum
 $gethRPC = new jsonRPCClient('http://127.0.0.1:8545');
 
+// Processing request: check for valid address logout on 0x0
 if (strlen($_GET['addr']) == 42) {
-        $addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_GET['addr']));
-} else if($_GET['addr'] == "0x0"){
+    $addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_GET['addr']));
+} else if($_GET['addr'] == "0x0") {
 	session_destroy();
-        $message['Authentication'] = "Logout";
-        echo json_encode($message);
-        exit;
-}else{
+    $message['Authentication'] = "Logout";
+    echo json_encode($message);
+    exit;
+} else {
 	session_destroy();
 	$message['Error'] = "Address invalid";
 	echo json_encode($message);
 	exit;
 }
+
+// Check if the message contains a signature or create a new challenge
 if (strlen($_GET['sign']) == 132) {
-        $sign = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_GET['sign']));
+    $sign = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_GET['sign']));
 }else{
-	$challenge = random_str(25);
-	$query = "INSERT INTO challenges (addr, challenge) VALUES ('$addr', '$challenge')";
-	$session->execute(new Cassandra\SimpleStatement($query));
-	$arrayChallenge['Challenge'] = $challenge;
-        echo json_encode($arrayChallenge);
+    $arrayChallenge = createChallenge($addr, $session);
+    echo json_encode($arrayChallenge);
 	exit;
 }
 
+// Check if the challenge is OK
 $user = getChallenge($addr,$session);
 $signingAddr = ecrecover(getTransaction($user['challenge'], $sign),$addr,$gethRPC);
 
 if ($user['addr'] == $signingAddr){
 	$_SESSION['loggedAddr'] = $signingAddr;
 	$query = "SELECT roles FROM users WHERE addr = '$signingAddr'";
-        foreach ($ml_session->execute(new Cassandra\SimpleStatement($query)) as $row) {
-        	//$roles = $row['roles'];
+    foreach ($ml_session->execute(new Cassandra\SimpleStatement($query)) as $row) {
+        // NOT USED YET: THIS IS A STUB
+        //$roles = $row['roles'];
 		foreach($row['roles'] as $role){
 			$_SESSION[$role] = true;
 		}
-        }
+    }
+    // build the responce
 	$arrayLogin['Authentication'] = "OK";
 	$arrayLogin['Address'] = $signingAddr;
-        echo json_encode($arrayLogin);
+    echo json_encode($arrayLogin);
 }else{
-        $challenge = random_str(25);
-        $query = "INSERT INTO challenges (addr, challenge) VALUES ('$addr', '$challenge')";
-        $session->execute(new Cassandra\SimpleStatement($query));
+    // challenge NOK: create a new one
+    $arrayChallenge = createChallenge($addr, $session);
 	$arrayLogin['Authentication'] = "KO";
-	$arrayLogin['Challenge'] = $challenge;
-        echo json_encode($arrayLogin);
+    echo json_encode($arrayLogin);
 }
 
 /*
 FUNCTIONS
 */
+function createChallenge($addr, $session) {
+    challenge = random_str(25);
+    $query = "INSERT INTO challenges (addr, challenge) VALUES ('$addr', '$challenge')";
+    $session->execute(new Cassandra\SimpleStatement($query));
+	$arrayLogin['Challenge'] = $challenge; 
+	return $arrayLogin;
+}
 
 function getChallenge ($addr, $session){
 	$query = "SELECT * FROM challenges WHERE addr = '$addr'";
 	$counter=0;
 	foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
-	$user['addr'] = $row['addr'];
-	$user['challenge'] = $row['challenge'];
-	$counter++;
+	    $user['addr'] = $row['addr'];
+	    $user['challenge'] = $row['challenge'];
+	    $counter++;
 	}
 	$query = "DELETE FROM challenges WHERE addr = '$addr'";
 	$session->execute(new Cassandra\SimpleStatement($query));
 	return $user;
 }
 
-function random_str($length, $keyspace = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')
-{
+function random_str($length, $keyspace = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ') {
     $str = '';
     $max = mb_strlen($keyspace, '8bit') - 1;
     for ($i = 0; $i < $length; ++$i) {

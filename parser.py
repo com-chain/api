@@ -30,7 +30,7 @@ from StringIO import StringIO
 from contextlib import contextmanager
 from glob import glob
 from uuid import UUID
-from webhook import processWebhookTransaction, openCassandraSession
+from webhook import processWebhookTransaction, openCassandraSession, openCassandraSessionStagingTransaction
 
 if sys.version_info[0] != 2 or sys.version_info[1] != 7:
     sys.exit("\nCQL Shell supports only Python 2.7\n")
@@ -132,7 +132,9 @@ from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 import json
 
+has_some_shop_tx = False
 session = openCassandraSession()
+sessioStaging = openCassandraSessionStagingTransaction()
 for line in sys.stdin:
 	if line == "true\n":
 		break
@@ -169,39 +171,64 @@ for line in sys.stdin:
 	cqlInsertHash = "INSERT INTO trans_by_addr (hash, addr) VALUES ('{}', {})".format(transHash, addrJson)
 	print(cqlInsertHash)
 	session.execute(cqlInsertHash)
-	# Check if the transaction is in the webshop_transactions
-	cqlcommand = "SELECT hash, store_id, store_ref, delegate , toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
-	rows = session.execute(cqlcommand)
-	if len(rows)>0:
-	    row = rows[0]
-	    if 'store_id' in row: # this is a webshop transaction
-	        store_id = row['store_id']
-	        store_ref = row['store_ref']
-	        attempt_date = row['stamp']-10800000
+	
+	# Check if the transaction is in the pending transaction table (webshop_transactions)
+	cqlcommand = "SELECT hash, store_id, store_ref, delegate , message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
+	rows = sessioStaging.execute(cqlcommand)
+	additional_fields = []
+	additional_values = []
+	shop_tx = False
+	
+	
+	for row in rows:	    
+	    # message
+	    if hasattr(row, 'message_from')  and row.message_from is not None:
+	         additional_fields.append('message_from')
+	         additional_values.append("'{}'".format(row.message_from)) 
 	    
-	        if 'delegate' in row: 
-	            # this is a delegated webshop transaction
-	            cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status, store_id, store_ref, tr_attempt_nb, tr_attempt_date, delegate) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 1,'{}','{}',0,{}) IF NOT EXISTS".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, store_id, store_ref, attempt_date, row['delegate'] )
-	        
-	        else:
-	            # this is a webshop transaction without delegation
-	            cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status, store_id, store_ref, tr_attempt_nb, tr_attempt_date) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 1, '{}','{}',0) IF NOT EXISTS".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, store_id, store_ref, attempt_date)
-	            
-	    elif 'delegate' in row: 
-	        # this is a delegated transaction
-	        cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status, delegate) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 0, '{}')".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, row['delegate'])
-	else:
-	    #transaction not linked to a webshop nor delegated
-	    cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, status) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', 0) IF NOT EXISTS".format(transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo)
+	    if hasattr(row, 'message_to')  and row.message_to is not None:
+	         additional_fields.append('message_to')
+	         additional_values.append("'{}'".format(row.message_to)) 
+	         
+	    # delegate
+	    if hasattr(row, 'delegate')  and row.delegate is not None:
+	         additional_fields.append('delegate')
+	         additional_values.append("'{}'".format(row.delegate)) 
+	         
+	    # webshop
+	    if hasattr(row, 'store_id')  and row.store_id is not None: # this is a webshop transaction
+	        shop_tx = True
+	        has_some_shop_tx = True
+	        additional_fields.append('store_id')
+	        additional_values.append("'{}'".format(row.store_id)) 
+	        additional_fields.append('store_ref')
+	        additional_values.append("'{}'".format(row.store_ref))  # check for '
+	        additional_fields.append('status')
+	        additional_values.append("1") # New shop transction
+	        additional_fields.append('tr_attempt_nb')
+	        additional_values.append("0") 
+	        additional_fields.append('tr_attempt_date')
+	        additional_values.append("'{}'".format(row.stamp-10800000)) 
+        
+	if not shop_tx:
+	    additional_fields.append('status')
+            additional_values.append('0') # Not a shop transction
+
+	
+	if len(additional_fields)>0:
+	    add_fields = ', '.join(additional_fields)
+	    add_val =  ', '.join(additional_values)
+        cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, {}) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', {}) IF NOT EXISTS".format(add_fields,transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, add_val )
 	
 	print(cqlcommand)
 	session.execute(cqlcommand)
 	
 	# Clear the webshop_transactions
-	cqlcommand = "DELETE FROM  webshop_transactions WHERE hash='{}'".format(transHash)
-	rows = session.execute(cqlcommand)
+	#cqlcommand = "DELETE FROM  webshop_transactions WHERE hash='{}'".format(transHash)
+	#rows = sessioStaging.execute(cqlcommand)
 
 # send webhook for the newly inserted transactions	
-processWebhookTransaction(True)
+if has_some_shop_tx:
+    processWebhookTransaction(True)
 	
 	

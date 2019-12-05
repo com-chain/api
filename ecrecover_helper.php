@@ -7,12 +7,20 @@ require_once './Keccak.php';
 use kornrunner\Keccak;
 
 function personal_ecRecover($msg, $signed) {
-    $personal_prefix_msg = "\x19Ethereum Signed Message:\n". strlen($msg). $msg;
-    $hex = keccak256($personal_prefix_msg);
-    return ecRecover($hex, $signed);
+    return personal_ecRecoverPublic($msg, $signed)[0];
 }
 
 function ecRecover($hex, $signed) {
+    return ecRecoverPublic($hex, $signed)[0];
+}
+
+function personal_ecRecoverPublic($msg, $signed) {
+    $personal_prefix_msg = "\x19Ethereum Signed Message:\n". strlen($msg). $msg;
+    $hex = keccak256($personal_prefix_msg);
+    return ecRecoverPublic($hex, $signed);
+}
+    
+function ecRecoverPublic($hex, $signed) {
     $rHex   = substr($signed, 2, 64);
     $sHex   = substr($signed, 66, 64);
     $vValue = hexdec(substr($signed, 130, 2));
@@ -37,7 +45,7 @@ function ecRecover($hex, $signed) {
     $publicKey = Signature::recoverPublicKey($rGmp, $sGmp, $messageGmp, $recovery);
     $publicKeyString = $publicKey["x"] . $publicKey["y"];
 
-    return '0x'. substr(keccak256(hex2bin($publicKeyString)), -40);
+    return array('0x'. substr(keccak256(hex2bin($publicKeyString)), -40),$publicKeyString);
 }
 
 function strToHex($string)
@@ -49,3 +57,5 @@ function strToHex($string)
 function keccak256($str) {
     return '0x'. Keccak::hash($str, 256);
 }
+
+?>

@@ -38,8 +38,9 @@ function saveAddress($uid, $token, $pubkeyid, $currency, $adresse, $maxAccounts)
         $dbg=',in,'.$maxAccounts.',' ;
         $count=1; 
         $addr = $adresse;
-        $sql ="SELECT Adresses, Count from $table where Code = '$uid'";
-        foreach ($session->execute(new Cassandra\SimpleStatement($sql)) as $row) {
+        $sql ="SELECT Adresses, Count from $table where Code = ?";
+        $options = array('arguments' => array($uid));
+        foreach ($session->execute(new Cassandra\SimpleStatement($sql), $options) as $row) {
 	        $count = $row['Count']+1;
 
                 if ($row['adresses'] != ""){ 
@@ -51,8 +52,9 @@ function saveAddress($uid, $token, $pubkeyid, $currency, $adresse, $maxAccounts)
 	$result = "KO";
 	if ($count < $maxAccounts) {
                         $dbg = $dbg.'count ok,';  
-		        $updateCount = "UPDATE $table SET Count=$count, Adresses='$addr' WHERE Code='$uid'";
-		        if ($session->execute(new Cassandra\SimpleStatement($updateCount))) {            
+		        $updateCount = "UPDATE $table SET Count=$count, Adresses=? WHERE Code=?";
+                $options = array('arguments' => array($add,$uid));
+		        if ($session->execute(new Cassandra\SimpleStatement($updateCount), $options)) {            
 		            $result = "OK";
                               
 		        }

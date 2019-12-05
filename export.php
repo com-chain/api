@@ -33,10 +33,10 @@ $cluster  = Cassandra::cluster('127.0.0.1')
 $keyspace  = 'comchain';
 $session  = $cluster->connect($keyspace);
 
-$query = "SELECT * FROM transactions";
-$query = "SELECT hash from trans_by_addr WHERE addr CONTAINS '$addr'";
+$query = "SELECT hash from trans_by_addr WHERE addr CONTAINS ?";
+$options = array('arguments' => array($addr));
 $counter=0;
-foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
+foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
 $string[$counter] = implode(",",$row);
 $counter++;
 }
@@ -48,7 +48,7 @@ $hashes = str_replace("\"", "'", $hashes);
 #$counter = $offset + $limit;
 #$query = "PAGING OFF";
 #$session->execute(new Cassandra\SimpleStatement($query));
-$query = "select addr_from, addr_to, time, recieved, sent, tax, type, hash, block from transactions WHERE hash IN $hashes AND time >= '$start' AND time <= '$end' ORDER by time";
+$query = "select * from transactions WHERE hash IN $hashes AND time >= '$start' AND time <= '$end' ORDER by time";
 $counter = 0;
 foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
 $jstring[$counter] = json_encode($row);
