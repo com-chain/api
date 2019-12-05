@@ -48,7 +48,7 @@ $hashes = str_replace("\"", "'", $hashes);
 #$counter = $offset + $limit;
 #$query = "PAGING OFF";
 #$session->execute(new Cassandra\SimpleStatement($query));
-$query = "select addr_from, addr_to, time, recieved, sent, tax, type, hash, block from transactions WHERE hash IN $hashes AND time >= '$start' AND time <= '$end' ORDER by time";
+$query = "select * from transactions WHERE hash IN $hashes AND time >= '$start' AND time <= '$end' ORDER by time";
 $counter = 0;
 foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
 $jstring[$counter] = json_encode($row);
