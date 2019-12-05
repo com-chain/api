@@ -157,7 +157,7 @@ function getRPCResponse($result){
 
 // Lookup into the DB for a valid shop from the REQUEST parameters
 
-function validateShop( $shop_id, $server_name){
+function validateShop($shop_id, $server_name){
    $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")->build();
    $keyspace  = 'comchain';
    $session  = $cluster->connect($keyspace);
