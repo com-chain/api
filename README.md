@@ -36,6 +36,7 @@ Access the DB node:
 
 ├── export.php       - to retrieve a time-based set of transaction 
 
+├── keys.php         - store and retrieve message keys 
 
 Access to the IPFS node:
 
@@ -50,7 +51,7 @@ Scripts:
 
 ├── update.sh         - for filling the DB from Blckchain Logs
 
-├── webhook.py        - for sending whebhook
+├── webhook.py        - for sending whebhook (called from parser.py and ReSendFailedWebhook.py
 
 ├── ReSendFailedWebhook.py
 
