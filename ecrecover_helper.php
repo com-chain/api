@@ -6,6 +6,20 @@ require_once './vendor/autoload.php';
 require_once './Keccak.php';
 use kornrunner\Keccak;
 
+function TransactionEcRecover($rawTx) {
+    // get the signature, last 134 chars
+    $len = strlen($rawTx);
+    $len_data = $len - 134;
+    $data = substr($rawTx, 0, $len_data);
+    $signature = substr($rawTx, $len_data);
+    $v = substr($signature,0,2);
+    $r = substr($signature,4,64);
+    $s = substr($signature,70,64);
+    $signed = '0x'.$r.$s.$v;
+    return ecRecoverPublic($data, $signed);
+}
+
+
 function personal_ecRecover($msg, $signed) {
     return personal_ecRecoverPublic($msg, $signed)[0];
 }

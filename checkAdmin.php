@@ -29,7 +29,7 @@ function getServerConfig($server){
     return $json->{'server'};  
 }
 
-function getAccType($address,$contract){
+function getAccType($address, $contract){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
     $ethCall = ['to' =>$contract, 
@@ -53,7 +53,7 @@ function getAccType($address,$contract){
     return substr($data,-1);  
 }
 
-function getAccStatus($address,$contract){
+function getAccStatus($address, $contract){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
     $ethCall = ['to' =>$contract, 
@@ -77,6 +77,33 @@ function getAccStatus($address,$contract){
     
     return substr($data,-1);
 }
+
+function getBalance($address, $contract){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => '0x70a08231000000000000000000000000'.substr($address,2)
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'}; 
+    
+    return hexdec($data);
+}
+
+
 
 function checkSign($dat, $signature, $caller){
   

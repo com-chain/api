@@ -173,7 +173,7 @@ for line in sys.stdin:
 	session.execute(cqlInsertHash)
 	
 	# Check if the transaction is in the pending transaction table (webshop_transactions)
-	cqlcommand = "SELECT hash, store_id, store_ref, delegate , message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
+	cqlcommand = "SELECT hash, store_id, store_ref, wh_status, delegate , message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
 	rows = sessioStaging.execute(cqlcommand)
 	additional_fields = []
 	additional_values = []
@@ -202,11 +202,16 @@ for line in sys.stdin:
 	        additional_fields.append('store_id')
 	        additional_values.append("'{}'".format(row.store_id)) 
 	        additional_fields.append('store_ref')
-	        additional_values.append("'{}'".format(row.store_ref))  # check for '
+	        additional_values.append("'{}'".format(row.store_ref))  
+	        
+	        status = row.wh_status
+	        nb_attempt ='0'
+	        if status>1: # 2 failed attempt / 3 success
+	            nb_attempt ='1'
 	        additional_fields.append('status')
-	        additional_values.append("1") # New shop transction
+	        additional_values.append(status) # New shop transction 
 	        additional_fields.append('tr_attempt_nb')
-	        additional_values.append("0") 
+	        additional_values.append(nb_attempt) 
 	        additional_fields.append('tr_attempt_date')
 	        additional_values.append("'{}'".format(row.stamp-10800000)) 
         

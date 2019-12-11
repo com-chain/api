@@ -1,5 +1,8 @@
 <?php
 header('Access-Control-Allow-Origin: *');
+include './checkAdmin.php';
+include './ecrecover_helper.php';
+include './Webhook.php';
 require_once 'libs/jsonRPCClient.php';
 
 $gethRPC = new jsonRPCClient('http://127.0.0.1:8545');
@@ -78,6 +81,9 @@ function getEstimatedGas($txobj, $gethRPC){
     }
     return json_encode($data);
 }
+
+
+
 function getEthCall($txobj, $gethRPC){
     $data = getDefaultResponse();
     try {
@@ -161,13 +167,13 @@ function validateShop($shop_id, $server_name){
    $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")->build();
    $keyspace  = 'comchain';
    $session  = $cluster->connect($keyspace);
-   $query = "SELECT * FROM sellers WHERE store_id = ? AND server_name = ? "; 
+   $query = "SELECT webhook_url FROM sellers WHERE store_id = ? AND server_name = ? "; 
    $options = array('arguments' => array($shop_id, $server_name)); 
    foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
-	 return true;
+	 return $row['webhook_url'];
    }
    
-   return false;
+   return "";
 }
 
 
@@ -176,10 +182,14 @@ function validateShopData() {
     $shop_id=$_REQUEST['shopId'];
     $shop_ref=$_REQUEST['txId'];
     $server_name=$_REQUEST['serverName'];
-    return (isset($shop_id) && isset($server_name) && isset($shop_ref) && validateShop( $shop_id, $server_name));
+    if (isset($shop_id) && isset($server_name) && isset($shop_ref)) {
+        return validateShop( $shop_id, $server_name);
+    } else {
+        return "";
+    }
 }
 
-function storeAdditionalData($transaction_ash) {
+function storeAdditionalData($is_valid_shop, $transaction_ash, $web_hook_status) {
     $shop_id=$_REQUEST['shopId'];
     $shop_ref=$_REQUEST['txId'];
     $delegate=$_REQUEST['delegate'];
@@ -189,7 +199,11 @@ function storeAdditionalData($transaction_ash) {
     $do_insert=false;
     $fields =array();
     $val =array();
-    if (validateShopData()) {
+   
+    $fields['wh_status'] = $web_hook_status;
+    $val[]='?';
+    
+    if ($is_valid_shop) {
         $fields['store_id'] = $shop_id;
         $fields['store_ref'] = $shop_ref; 
         $val[]='?';  
@@ -211,7 +225,8 @@ function storeAdditionalData($transaction_ash) {
         $val[]='?';    
     }
     
-    if (sizeof($fields)>0) {
+    // Add if not only the status
+    if (sizeof($fields)>1) {
         $fields['hash'] = $transaction_ash;
         $val[]='?';    
         // build the query
@@ -228,16 +243,59 @@ function storeAdditionalData($transaction_ash) {
 
 function sendRawTransaction($rawtx,$gethRPC){
     $data = getDefaultResponse();
+    
+    $shop_url = validateShopData();
+    
+  
+    
+    $contract = '';
+    $dest = '';
+    $amount = 0;
+    $to_bal = 0;
+    $wh_status = 0;
     try {
+        if (strlen($shop_url)>0) {
+            $config = getServerConfig($_REQUEST['serverName']);
+            $contract = $config->{'contract_1'};
+            // if so get the dest
+            $dest = '0x'.$rawtx.substr(110,40);
+            // get the sender
+            $sender = TransactionEcRecover($rawtx)[0];
+
+            // get the amount
+            $amount = hexdec($rawtx.substr(150,64);
+            // get the balances for dest
+            $to_bal = getBalance($dest, $contract);
+            $from_bal = getBalance($sender, $contract);
+            $wh_status = 1;
+        }
+        
         $data['data'] = getRPCResponse($gethRPC->eth_sendRawTransaction($rawtx));
+        
+        if (strlen($shop_url)>0 && $amount > 0) {
+            // get the balances check if changes compatible the the amount 
+            $to_bal_after = getBalance($dest, $contract);
+            $from_bal_after = getBalance($sender, $contract);
+            if ($to_bal_after - $to_bal >= $amount && $from_bal - $from_bal_after >= $amount) {
+                // if so : send the webhook 
+                $message = createWebhookMessage($data['data'], $_REQUEST['serverName'], 
+                                                $_REQUEST['shopId'], $_REQUEST['txId'], 
+                                                $sender, $rawtx);
+                $res = sendWebhook($shop_url, $message);
+                if ($res) {
+                    $wh_status = 3;
+                } else {
+                    $wh_status = 2;
+                }
+            }
+        }   
     }
     catch (exception $e) {
         $data['error'] = true;
         $data['msg'] = 'E1'.$e->getMessage();
     }
-    
     try {
-        storeAdditionalData($data['data']);
+        storeAdditionalData(strlen($shop_url)>0, $data['data'], $wh_status);
     }
     catch (exception $e) {
         $data['error'] = true;
@@ -245,6 +303,7 @@ function sendRawTransaction($rawtx,$gethRPC){
     }
     return json_encode($data);
 }
+
 
 function formatAddress($addr){
     if (substr($addr, 0, 2) == "0x")

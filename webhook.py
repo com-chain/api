@@ -245,48 +245,7 @@ def buildWebhookMessage(transaction, server_name):
    return data 
    
    
-def buildPreWebhookMessage(tr_hash, server_name, store_id, store_ref, rawtx):
-   function = rawtx[78:86]
-   type_tr = 'TransferCredit' if '0x'+function == CM_TRANSFERT else 'Transfer'
-   
-   dest = '0x'+ rawtx[110:150]
-   amount = int(rawtx[150:214],16)/100.0
 
-   h = platform.uname()[1]
-
-   data = {}
-   data['id']=tr_hash
-   data['create_time']=transaction['time']
-   data['resource_type']='sale'
-   data['event_type']='PAYMENT.SALE.PENDING'
-   data['summary']='A sale is pending. The payement has been recieved and is currently processed.'
-   
-   # Link to the transaction data through the API
-   link={}
-   link['href']= '{}/api.php?hash={}'.format(h, tr_hash)
-   link['method']='GET'
-   
-   resource={}
-   resource['id']=tr_hash
-   resource['create_time']= int(time.time())
-   resource['state']="pending"
-   resource['store_id'] = store_id
-   resource['reference'] = store_ref
-   resource['links']=[link]
-   resource['addr_to']=dest
-   
-   amount={}
-   amount['sent']=amount
-   amount['type']=type_tr
-   amount['currency']=server_name
-   
-   resource['amount']=amount
-   data['resource']=resource
-   data['links']=[link]
-   
-   return data 
-   
-   
     
  
 def sendWebhook(url, message):
@@ -298,7 +257,7 @@ def sendWebhook(url, message):
 
     # prepare the string to be signed
     crc = binascii.crc32(json_message)
-    sign_str = "{}|{}|{}|{}".format(message['id'], message['create_time'], message[resource]['store_id'], crc)
+    sign_str = crc
     
     #load the key
     private_key =  open(private_key_path, 'r').read() 
