@@ -18,35 +18,42 @@ function createWebhookMessage($tr_hash, $server_name, $store_id, $store_ref, $fr
     $base_link .= "://"; 
     $base_link .= $_SERVER['HTTP_HOST']; 
      
-    $link = {'href'=>$base_link.'/api.php?hash='.$tr_hash,
-             'method'=>'GET'};
+    $link = array (
+                    "href"=>$base_link."/api.php?hash=".$tr_hash,
+                    "method"=>"GET"
+                  );
              
-    $amount = { 'sent'=> $amount,
-                'type'=> $type_tr,
-                'currency' => $server_name
-              };
+    $amount = array ( 
+                        'sent'=> $amount,
+                        'type'=> $type_tr,
+                        'currency' => $server_name
+                    );
 
              
-    $resources = {'id'=>$tr_hash,
+    $resources = array (
+                  'id'=>$tr_hash,
                   'create_time'=> $time,
-                  'state'='completed',
+                  'state'=>'completed',
                   'store_id' => $store_id,
                   'reference' => $store_ref,
                   'links'=>[$link],
-                  'addr_from'=> $from_add,
+                  
                   'addr_to' => $dest,
                   'amount'=>$amount
-                 };         
+                 );   
+    if (strlen($from_add)>0) {
+        $resources['addr_from']=$from_add;
+    }      
              
     
-    $data = {'id'=>$tr_hash,
+    $data = array ('id'=>$tr_hash,
              'create_time'=>$time, 
              'resource_type'=>'sale', 
              'event_type'=> 'PAYMENT.SALE.COMPLETED',
              'summary'=>'A sale has been completed. The payement has been processed.',
              'links'=>[$link],
              'resources'=>$resources
-             };
+             );
     
     return $data;
 }
