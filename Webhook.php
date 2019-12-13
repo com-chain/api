@@ -74,7 +74,7 @@ function sendWebhook($url, $message) {
                                                    'COMCHAIN-CERT-URL:'.$public_key_url));
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_HEADER, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_message);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $message);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
         $passed=true;
