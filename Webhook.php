@@ -2,7 +2,7 @@
 
 $NANT_TRANSFERT = "0xa5f7c148";
 $CM_TRANSFERT = "0x60ca9c4c";
-$private_key_path ='../ComChain/comchainwebhook_rsa';
+$private_key_path ='../ComChainKey/comchainwebhook_rsa';
 $public_key_url ='https://com-chain.org/comchainwebhook_rsa.pub';
 
 
