@@ -6,18 +6,39 @@ require_once './vendor/autoload.php';
 require_once './Keccak.php';
 use kornrunner\Keccak;
 
+require_once './Buffer.php';
+
+function encodeLength(int $l, int $offset)
+    {
+        if ($l < 56) {
+            return Buffer::int($l + $offset)->getHex();
+        }
+        if ($l < 256 ** 8) {
+            /** @var string $bl */
+            $bl = Buffer::int($l)->getBinary();
+            return (Buffer::int(strlen($bl) + $offset + 55)->getHex()) . (Buffer::int($l)->getHex());
+        }
+        throw new \Exception('Failed to encode length');
+    }
+
 
 function TransactionEcRecover($rawTx) {
     // get the signature, last 134 chars
     $len = strlen($rawTx);
     $len_data = $len - 134;
-    $data = substr($rawTx, 0, $len_data);
     $signature = substr($rawTx, $len_data);
     $v = substr($signature,0,2);
     $r = substr($signature,4,64);
     $s = substr($signature,70,64);
     $signed = '0x'.$r.$s.$v;
-    return ecRecoverPublic($data, $signed);
+    
+    // get the rlp encoded data (change the length)
+    $subs = substr($rawTx, 6, $len_data-6); // 2 for the 0x + 4 for the 2 first bytes giving the length with the signature
+    $data_len = strlen($subs)/2;
+    // add the new length
+    $data = encodeLength($data_len,192).$subs;
+    $hash = keccak256WithPrefix(hex2bin($data));
+    return ecRecoverPublic($hash, $signed);
 }
 
 
