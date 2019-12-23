@@ -2,7 +2,7 @@
 
 $NANT_TRANSFERT = "0xa5f7c148";
 $CM_TRANSFERT = "0x60ca9c4c";
-$private_key_path ='../ComChain/comchainwebhook_rsa';
+$private_key_path ='../ComChainKey/comchainwebhook_rsa';
 $public_key_url ='https://com-chain.org/comchainwebhook_rsa.pub';
 
 
@@ -74,7 +74,7 @@ function sendWebhook($url, $message) {
                                                    'COMCHAIN-CERT-URL:'.$public_key_url));
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_HEADER, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_message);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $message);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
         $passed=true;

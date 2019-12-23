@@ -259,13 +259,13 @@ function sendRawTransaction($rawtx,$gethRPC){
             // if so get the dest
             $dest = '0x'.$rawtx.substr(110,40);
             // get the sender
-            // TODO $sender = TransactionEcRecover($rawtx)[0];
+            $sender = TransactionEcRecover($rawtx)[0];
 
             // get the amount
             $amount = hexdec($rawtx.substr(150,64));
-            // get the balances for dest
+            // get the balances 
             $to_bal = getBalance($dest, $contract);
-            // TODO $from_bal = getBalance($sender, $contract);
+            $from_bal = getBalance($sender, $contract);
             $wh_status = 1;
         }
         
@@ -275,11 +275,11 @@ function sendRawTransaction($rawtx,$gethRPC){
             // get the balances check if changes compatible the the amount 
             $to_bal_after = getBalance($dest, $contract);
             $from_bal_after = getBalance($sender, $contract);
-            if ($to_bal_after - $to_bal >= $amount) { // TODO} && $from_bal - $from_bal_after >= $amount) {
+            if (($to_bal_after - $to_bal >= $amount)  && ($from_bal - $from_bal_after >= $amount)) {
                 // if so : send the webhook 
                 $message = createWebhookMessage($data['data'], $_REQUEST['serverName'], 
                                                 $_REQUEST['shopId'], $_REQUEST['txId'], 
-                                                "", $rawtx); // TODO ""=> $sender
+                                                $sender, $rawtx); 
                 $res = sendWebhook($shop_url, $message);
                 if ($res) {
                     $wh_status = 3;
