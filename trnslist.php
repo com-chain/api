@@ -29,28 +29,34 @@ $session  = $cluster->connect($keyspace);
  
 $query = "SELECT hash from trans_by_addr WHERE addr CONTAINS ?";
 $options = array('arguments' => array($addr));
-$counter=0;
+$counter_tr=0;
 foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
-$string[$counter] = implode(",",$row);
-$counter++;
+  $string[$counter] = implode(",",$row);
+  $counter_tr++;
 }
 isset($string) or exit("[]");
 $hashes = json_encode($string);
 $hashes = str_replace("[", "(", $hashes);
 $hashes = str_replace("]", ")", $hashes);
 $hashes = str_replace("\"", "'", $hashes);
-$counter = $offset + $limit;
-$query = "select * from transactions WHERE hash IN $hashes ORDER BY time DESC limit $counter;";
+$counter = min($offset + $limit, $counter_tr);
+$query = "select * from tokentransactions WHERE hash IN $hashes ORDER BY time DESC limit $counter;";
 
-$counter = 0;
+$counter_res = 0;
 foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
-$jstring[$counter] = json_encode($row);
-$counter++;
+   $jstring[$counter] = json_encode($row);
+   $counter_res++;
 }
-$jstring = array_slice($jstring, -$limit);
+$number_rec = $counter_res - $offset;
+if ($number_rec>0){
+    $jstring = array_slice($jstring, -$number_rec);
+} else {
+    $jstring = null;
+}
+
 if ($jstring != null){ 
-echo json_encode($jstring);
+    echo json_encode($jstring);
 }else{
-echo "[]";
+    echo "[]";
 }
 ?>

@@ -8,10 +8,18 @@ $public_key_url ='https://com-chain.org/comchainwebhook_rsa.pub';
 
 
 function createWebhookMessage($tr_hash, $server_name, $store_id, $store_ref, $from_add,$rawtx){
-    $funct = $rawtx.substring(78,8);
-    $type_tr = ("0x".$funct == CM_TRANSFERT)? 'TransferCredit' : 'Transfer';
-    $dest = "0x".$rawtx.substring(110,40);
-    $amount = hexdec($rawtx.substring(150,64))/100.0;
+    $tr_info = substr($rawtx,-316,182);
+    //get the type of transfert
+    $funct_address = substr($tr_info,46,8);
+    $type_tr = ("0x".strtolower($funct_address) == CM_TRANSFERT)? 'TransferCredit' : 'Transfer';
+
+    // get the dest
+    $dest = '0x'.substr($tr_info,78,40);
+        
+    // get the amount
+    $amount = hexdec(substr($rawtx,-64))/100.0;
+
+
     $time = time();
     
     $base_link = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http"; 

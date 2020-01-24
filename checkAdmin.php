@@ -78,6 +78,18 @@ function getAccStatus($address, $contract){
     return substr($data,-1);
 }
 
+function converthex($hex){
+     $short_data = '0x'+ substr($hex, -12);
+     $val = hexdec($short_data);
+
+     if ($val>(34359738368*4096)){
+            $val-=68719476736*4096;
+     }
+
+    return $val; 
+}
+
+
 function getBalance($address, $contract){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
@@ -100,7 +112,107 @@ function getBalance($address, $contract){
     $json = json_decode($response);
     $data= $json->{'data'}; 
     
-    return hexdec($data);
+    return converthex($data);
+}
+
+function getCMBalance($address, $contract){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => '0xbbc72a17000000000000000000000000'.substr($address,2)
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'}; 
+    
+    return converthex($data);
+}
+
+function getNTBalance($address, $contract){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => '0xae261aba000000000000000000000000'.substr($address,2)
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'}; 
+    
+    return converthex($data);
+}
+
+function getCMLimitP($address, $contract){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => '0xae7143d6000000000000000000000000'.substr($address,2)
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'}; 
+    
+    return converthex($data);
+}
+
+function getCMLimitM($address, $contract){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => '0xcc885a65000000000000000000000000'.substr($address,2)
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'}; 
+    
+    return converthex($data);
 }
 
 

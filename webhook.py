@@ -183,18 +183,18 @@ def openCassandraSessionStagingTransaction():
 
 def transmissionSucceeded(transaction_hash):
     session = openCassandraSession()
-    cqlcommand = "INSERT INTO transactions (hash, status) VALUES ('{}', 3)".format(transaction_hash)
+    cqlcommand = "INSERT INTO tokentransactions (hash, wh_status) VALUES ('{}', 3)".format(transaction_hash)
     session.execute(cqlcommand)
    
 def transmissionFailed(transaction_hash, attempt_number, max_attempt):
-    status=2
+    wh_status=2
     if attempt_number==max_attempt:
-        status = 4
+        wh_status = 4
     else:
         attempt_number+=1
         
     session = openCassandraSession()
-    cqlcommand = "INSERT INTO transactions (hash, status, tr_attempt_nb) VALUES ('{}', {}, {})".format(transaction_hash, status, attempt_number)
+    cqlcommand = "INSERT INTO tokentransactions (hash, wh_status, tr_attempt_nb) VALUES ('{}', {}, {})".format(transaction_hash, wh_status, attempt_number)
     session.execute(cqlcommand)
     
 def getWebhookInfo(store_id):
@@ -282,17 +282,17 @@ def sendWebhook(url, message):
 
     
 def processWebhookTransaction(new_ones):
-    query = "SELECT hash, block, recieved, sent, tax, time, type, addr_from, addr_to, store_id, store_ref, status, tr_attempt_nb, tr_attempt_date, toTimestamp(now()) AS stamp FROM transactions WHERE status=2 ALLOW FILTERING" 
+    query = "SELECT hash, block, recieved, sent, tax, time, type, addr_from, addr_to, store_id, store_ref, wh_status, tr_attempt_nb, tr_attempt_date, toTimestamp(now()) AS stamp FROM tokentransactions WHERE wh_status=2 ALLOW FILTERING" 
     if new_ones:
-        query = "SELECT hash, block, recieved, sent, tax, time, type, addr_from, addr_to, store_id, store_ref, status, tr_attempt_nb,  tr_attempt_date, toTimestamp(now()) AS stamp FROM transactions WHERE status=1 ALLOW FILTERING"
+        query = "SELECT hash, block, recieved, sent, tax, time, type, addr_from, addr_to, store_id, store_ref, wh_status, tr_attempt_nb,  tr_attempt_date, toTimestamp(now()) AS stamp FROM tokentransactions WHERE wh_status=1 ALLOW FILTERING"
         
     session = openCassandraSession()
     rows = session.execute(query)
     for transaction_row in rows:
-        if transaction_row['status']==2 and transaction_row['tr_attempt_date']>transaction_row['stamp'] - 10800000: # 3h en milisec delay for all
+        if transaction_row['wh_status']==2 and transaction_row['tr_attempt_date']>transaction_row['stamp'] - 10800000: # 3h en milisec delay for all
             continue
         
-        lock_query = "BEGIN BATCH INSERT INTO lock_processing (hash) VALUES ('"+transaction_row['hash']+"') IF NOT EXISTS;  INSERT INTO transactions (hash,tr_attempt_date) VALUES ('"+transaction_row['hash']+"', toTimestamp(now())) APPLY BATCH" 
+        lock_query = "BEGIN BATCH INSERT INTO lock_processing (hash) VALUES ('"+transaction_row['hash']+"') IF NOT EXISTS;  INSERT INTO tokentransactions (hash,tr_attempt_date) VALUES ('"+transaction_row['hash']+"', toTimestamp(now())) APPLY BATCH" 
         
         # if we are able to set the tr_attempt_date this lock the record and we can process it
         if session.execute(lock_query):
