@@ -1,6 +1,6 @@
 <?php
 header('Access-Control-Allow-Origin: *');
-$cluster  = Cassandra::cluster('127.0.0.1')  ->withCredentials("ping_ro", "Public_ping")->withIOThreads(5)
+$cluster  = Cassandra::cluster('127.0.0.1')  ->withCredentials("ping_ro", "Public_ping")
                 ->build();
 $keyspace  = 'comchain';
 $session  = $cluster->connect($keyspace);
