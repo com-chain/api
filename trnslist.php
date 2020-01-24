@@ -31,7 +31,7 @@ $query = "SELECT hash from trans_by_addr WHERE addr CONTAINS ?";
 $options = array('arguments' => array($addr));
 $counter_tr=0;
 foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
-  $string[$counter] = implode(",",$row);
+  $string[$counter_tr] = implode(",",$row);
   $counter_tr++;
 }
 isset($string) or exit("[]");
@@ -44,7 +44,7 @@ $query = "select * from tokentransactions WHERE hash IN $hashes ORDER BY time DE
 
 $counter_res = 0;
 foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
-   $jstring[$counter] = json_encode($row);
+   $jstring[$counter_res] = json_encode($row);
    $counter_res++;
 }
 $number_rec = $counter_res - $offset;
