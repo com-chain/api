@@ -168,9 +168,9 @@ for line in sys.stdin:
 	print transTime + " - Added transaction " + transHash + " from block " + transBlock
 	
 	# insert the correspondance table between the transaction hash and the address
-	cqlInsertHash = "INSERT INTO trans_by_addr (hash, addr) VALUES ('{}', {})".format(transHash, addrJson)
-	print(cqlInsertHash)
-	session.execute(cqlInsertHash)
+	# cqlInsertHash = "INSERT INTO trans_by_addr (hash, addr) VALUES ('{}', {})".format(transHash, addrJson)
+	# print(cqlInsertHash)
+	# session.execute(cqlInsertHash)
 	
 	# Check if the transaction is in the pending transaction table (webshop_transactions)
 	cqlcommand = "SELECT hash, store_id, store_ref, wh_status, delegate , message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
@@ -223,7 +223,7 @@ for line in sys.stdin:
 	if len(additional_fields)>0:
 	    add_fields = ', '.join(additional_fields)
 	    add_val =  ', '.join(additional_values)
-        cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, {}) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', {}) IF NOT EXISTS".format(add_fields,transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, add_val )
+        cqlcommand = "INSERT INTO testtransactions (hash, part, wh_status, block, recieved, sent, tax, time, type, addr_from, addr_to, {}) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', {}) IF NOT EXISTS".format(add_fields, addrJson, 0, transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, add_val )
 	
 	print(cqlcommand)
 	session.execute(cqlcommand)

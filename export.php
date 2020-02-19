@@ -5,26 +5,27 @@ if (strlen($_GET['addr']) == 42) {
 }else{
 	echo "Bye!";
 }
+
 if (empty($_GET['start'])) {
 	$_GET['start'] = 0;
 }
+
 if (empty($_GET['end'])) {
 	$_GET['end'] = 1999999999;
 }
+
 if (is_numeric($_GET['start'])){
 	$start = $_GET['start'];
 } else {
 	$start = 0;
 }
+
 if (is_numeric($_GET['end'])){
 	$end = $_GET['end'];
 } else {
 	$end = 1999999999;
 }
  
-#$dir = 'sqlite:/home/ethereum/transactions.db';
- 
-#$dbh = new PDO($dir) or die("cannot open database");
 
 $cluster  = Cassandra::cluster('127.0.0.1') 
 		->withCredentials("transactions_ro", "Public_transactions") 
@@ -33,28 +34,24 @@ $cluster  = Cassandra::cluster('127.0.0.1')
 $keyspace  = 'comchain';
 $session  = $cluster->connect($keyspace);
 
-$query = "SELECT hash from trans_by_addr WHERE addr CONTAINS ?";
+
+$query = "select * from testtransactions WHERE part CONTAINS ? AND time >= '$start' AND time <= '$end' ORDER by time";
 $options = array('arguments' => array($addr));
-$counter=0;
+
+
+$line_ct = 0;
+$hashes = [];
 foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
-$string[$counter] = implode(",",$row);
-$counter++;
+    if ($row['wh_status'] == 0) { // confirmed trans
+        $hashes[] = $row['hash'];
+    } else if (in_array($row['hash'], $hashes)){ // pending trans already found as completed
+        continue;
+    }
+    $jstring[$line_ct] = json_encode($row);
+    $line_ct++;
 }
-isset($string) or exit("[]");
-$hashes = json_encode($string);
-$hashes = str_replace("[", "(", $hashes);
-$hashes = str_replace("]", ")", $hashes);
-$hashes = str_replace("\"", "'", $hashes);
-#$counter = $offset + $limit;
-#$query = "PAGING OFF";
-#$session->execute(new Cassandra\SimpleStatement($query));
-$query = "select * from transactions WHERE hash IN $hashes AND time >= '$start' AND time <= '$end' ORDER by time";
-$counter = 0;
-foreach ($session->execute(new Cassandra\SimpleStatement($query)) as $row) {
-$jstring[$counter] = json_encode($row);
-$counter++;
-}
-$jstring = array_slice($jstring, -$limit);
+
+
 if ($jstring != null){
 echo json_encode($jstring);
 }else{
