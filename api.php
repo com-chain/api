@@ -7,7 +7,7 @@ require_once 'libs/jsonRPCClient.php';
 $gethRPC = new jsonRPCClient('http://127.0.0.1:8545');
 if(isset($_REQUEST['balance'])){
     header('Content-Type: application/json');
-    echo getBalance($_REQUEST['balance'],$gethRPC);
+    echo getEthBalance($_REQUEST['balance'],$gethRPC);
 } else if(isset($_REQUEST['rawtx'])){
     header('Content-Type: application/json');
     echo sendRawTransaction($_REQUEST['rawtx'],$gethRPC);
@@ -52,12 +52,22 @@ function getTransaction($hash, $gethRPC){
                 ->build();
         $keyspace  = 'comchain';
         $session  = $cluster->connect($keyspace);
-        $query = "SELECT * FROM transactions WHERE hash = ?"; 
+        $query = "SELECT * FROM testtransactions WHERE hash = ?"; 
         $options = array('arguments' => array($hash));
 
 	    foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
-	        $arr = $row;
+	        if ($row['direction']==1){
+	            if ( $row['status']==0 || !isset($arr)) {
+	                $arr = $row;
+	                $arr['addr_from'] = $arr['add1'];
+                    $arr['addr_to'] = $arr['add2'];
+                    $arr['time'] = $arr['time']->value();
+                }
+	        }
+	        
 	    }
+	    
+	    
 	    
         $arr['transaction'] = $ret;
         $ret = json_encode($arr);
@@ -133,7 +143,7 @@ function getTransactionData($addr, $gethRPC){
     }
     return json_encode($data);
 }
-function getBalance($addr, $gethRPC)
+function getEthBalance($addr, $gethRPC)
 {
     $data = getDefaultResponse();
     try {
@@ -239,7 +249,7 @@ function storeAdditionalData($is_valid_shop, $transaction_ash, $web_hook_status)
     }
 }
 
-function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $amount, $from, $to ) {
+function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $amount, $from, $to ,$trans_type) {
     $shop_id=$_REQUEST['shopId'];
     $shop_ref=$_REQUEST['txId'];
     $delegate=$_REQUEST['delegate'];
@@ -250,43 +260,43 @@ function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $a
     $do_insert=false;
     $fields =array();
     $val =array();
-   
+    
+    $fields['add1'] = $from;
+    $val[]='?'; 
+    $fields['add2'] = $to;
+    $val[]='?'; 
+    $fields['direction'] = 1;
+    $val[]='?'; 
+    
+    $fields['status'] = 1;
+    $val[]='?'; 
+    
     $fields['hash'] = $transaction_ash;
-    $val[]='?';    
-    $fields['addr_from'] = $from;
-    $val[]='?';
-    $fields['addr_to'] = $to;
-    $val[]='?';
+    $val[]='?'; 
+    
+   
     $fields['sent'] = $amount;
     $val[]='?';
     $fields['recieved'] = $amount;
     $val[]='?';
     $fields['tax'] = 0;
     $val[]='?';
-    $fields['wh_status'] = 1;
-    $val[]='?';
-    $fields['time'] = ''.time();
-    $val[]='?';
-    
-    $addrJson = "{'from':'" + $from + "','to':'" + $to + "'}";
-    $fields['part'] = $addrJson;
+    $fields['type'] = $trans_type;
     $val[]='?'; 
     
-    
-    $fields['status'] = $web_hook_status;
+    $fields['wh_status'] = $web_hook_status;
     $val[]='?';
-    
-    
+
     if ($is_valid_shop) {
         $fields['store_id'] = $shop_id;
         $fields['store_ref'] = $shop_ref; 
-        $val[]='?';  
-        $val[]='?';      
+        $val[]='?'; 
+        $val[]='?';    
     }
     
     if (isset($delegate)) {
         $fields['delegate'] = $delegate;
-        $val[]='?';    
+        $val[]='?';   
     }
     
     if (isset($parent_hash)) {
@@ -296,27 +306,37 @@ function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $a
     
     if (isset($memo_from) && $memo_from!="") {
         $fields['message_from'] = $memo_from;
-        $val[]='?';    
+        $val[]='?';   
     }
     
     if (isset($memo_to) && $memo_to!="") {
         $fields['message_to'] = $memo_to;
-        $val[]='?';    
+        $val[]='?';   
     }
     
-
+    /* incompatibiliy between the number of bytes=> set in the text
+    $fields['time'] = ''.time();
+    $val[]='?';
+    */
 
     // build the query
     $query = "INSERT INTO testtransactions (".join(', ',array_keys($fields));
-    $query = $query.') VALUES ('.join(', ',$val).')';
+    $query = $query.',time) VALUES ('.join(', ',$val).','.time().')';
     
     $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_rw", "Private_access_transactions")->build();
     $keyspace  = 'comchain';
-    $session  = $cluster->connect($keyspace);
+    $session1  = $cluster->connect($keyspace);
 
-    $session->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
+    $session1->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
+ 
+    $cluster2  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_rw", "Private_access_transactions")->build();
+    $session2  = $cluster2->connect($keyspace);
+    $fields['add1'] = $to;
+    $fields['add2'] = $from;
+    $fields['direction'] = 2; 
+    $session2->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
     
-  
+    
 }
 
 function getContract1($contract) { 
@@ -333,46 +353,84 @@ function getContract1($contract) {
 }
 
 
+function in_my_array($needle, $array){
+   
+    foreach ($array as $elem) {
+        if ($needle==$elem){
+            return true;
+        }
+    }
+    return false; 
+}
+
 function sendRawTransaction($rawtx,$gethRPC){
     $data = getDefaultResponse();
-    
-    
+                            //   Direct      From    On Behalf   Accept Request
+    $transfert_NA_functions = ['a5f7c148','58258353','1b6b1ee5','132019f4'];
+    $transfert_CM_functions = ['60ca9c4c','2ef9ade2','74c421fe','1415707c'];
+    $transfert_functs =  array_merge($transfert_NA_functions,$transfert_CM_functions);
+     
     try {
         $tr_info = substr($rawtx,-316,182);
-        
-        // get the contract for the balances
-        $contract = getContract1(substr($tr_info,0,40));
-        
-        // get the dest
-        $dest = '0x'.substr($tr_info,78,40);
+        //get the type of transfert
+        $funct_address = strtolower(substr($tr_info,46,8));
         // get the sender
         $sender = TransactionEcRecover($rawtx)[0];
-        // get the amount
-        $amount = hexdec(substr($tr_info,-64));
-        //get the type of transfert
-        $funct_address = substr($tr_info,46,8);
+        // get the contract for the balances
+        $contract = getContract1(substr($tr_info,0,40));
+  
+        $need_pending = false;
+        $amount = 0;
+        $trans_type = '';
+        if (in_my_array($funct_address, $transfert_functs)) {
+
+            if ($funct_address==$transfert_NA_functions[0] || $funct_address==$transfert_CM_functions[0]) {
+                // Direct Transfert
+                 
+                // get the dest
+                $dest = '0x'.substr($tr_info,78,40);
+                // get the amount
+                $amount = hexdec(substr($tr_info,-64));
+                //get the type of transfert
+                $funct_address = substr($tr_info,46,8);
+                
+                // get the infos 
+                $from_status = getAccStatus($sender, $contract);
+                $from_Nt_bal = getNTBalance($sender, $contract);
+                $from_Cm_bal = getCMBalance($sender, $contract);
+                $from_Cm_lim_m = getCMLimitM($sender, $contract);
+                
+                $to_status = getAccStatus($dest, $contract);
+                $to_Cm_bal = getCMBalance($dest, $contract);
+                $to_Cm_lim_p = getCMLimitP($dest, $contract);
+                
+                $check_passed = $from_status==1 && $to_status==1;
+                
+                // Check transaction is possible
+                if ($funct_address==$transfert_NA_functions[0]) {  // Nanti
+                    $check_passed &= $from_Nt_bal>=$amount;
+                    $trans_type = 'Transfer';
+                } else if ($funct_address==$transfert_CM_functions[0]) { // Mutual Credit
+                    // dest can accept amount
+                    $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
+                    // sender has credit 
+                    $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
+                    $trans_type = 'TransferCredit';
+                } else {
+                    $check_passed = false;
+                }
+                $need_pending = $check_passed;
+            } else if ($funct_address==$transfert_NA_functions[1] || $funct_address==$transfert_CM_functions[1]) {
+                // Transfert from 
+                // TODO
+            } else if ($funct_address==$transfert_NA_functions[2] || $funct_address==$transfert_CM_functions[2]) {
+                // Transfert On Behalf 
+                // TODO
+            } else if ($funct_address==$transfert_NA_functions[3] || $funct_address==$transfert_CM_functions[3]) {
+                // Accept reqest
+                // TODO
+            }
         
-        // get the infos 
-        $from_status = getAccStatus($sender, $contract);
-        $from_Nt_bal = getNTBalance($sender, $contract);
-        $from_Cm_bal = getCMBalance($sender, $contract);
-        $from_Cm_lim_m = getCMLimitM($sender, $contract);
-        
-        $to_status = getAccStatus($dest, $contract);
-        $to_Cm_bal = getCMBalance($dest, $contract);
-        $to_Cm_lim_p = getCMLimitP($dest, $contract);
-        
-        $check_passed = $from_status==1 && $to_status==1;
-        // Check transaction is possible
-        if (strtolower($funct_address) == "a5f7c148") {  // Nanti
-            $check_passed &= $from_Nt_bal>=$amount;
-        } else if (strtolower($funct_address) == "60ca9c4c") { // Mutual Credit
-            // dest can accept amount
-            $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
-            // sender has credit 
-            $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
-        } else {
-            $check_passed = false;
         }
           
         $data['data'] = getRPCResponse($gethRPC->eth_sendRawTransaction($rawtx));
@@ -382,7 +440,6 @@ function sendRawTransaction($rawtx,$gethRPC){
         if (strlen($shop_url)>0 && $amount > 0) {
             $wh_status = 1;
         }
-        
         
         if (strlen($shop_url)>0 && $amount > 0) {
             $message = createWebhookMessage($data['data'], $_REQUEST['serverName'], 
@@ -398,8 +455,10 @@ function sendRawTransaction($rawtx,$gethRPC){
         }
         storeAdditionalData(strlen($shop_url)>0, $data['data'], $wh_status);
         
-        storeTransaction(strlen($shop_url)>0, $data['data'], $wh_status, $amount, $sender, $dest ); 
-        
+        if ($need_pending) {
+            storeTransaction(strlen($shop_url)>0, $data['data'], $wh_status, $amount, $sender, $dest, $trans_type); 
+        }
+       
     } catch (exception $e) {
         $data['error'] = true;
         $data['msg'] = $e->getMessage();

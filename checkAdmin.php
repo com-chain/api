@@ -78,11 +78,13 @@ function getAccStatus($address, $contract){
     return substr($data,-1);
 }
 
-function getBalance($address, $contract){
+
+
+function getNumber($address, $contract, $function){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
     $ethCall = ['to' =>$contract, 
-                'data' => '0x70a08231000000000000000000000000'.substr($address,2)
+                'data' => $function.'000000000000000000000000'.substr($address,2)
                ];
     $fields = ['ethCall'=>$ethCall];
     $fields_string = http_build_query($fields);
@@ -101,6 +103,27 @@ function getBalance($address, $contract){
     $data= $json->{'data'}; 
     
     return hexdec($data);
+}
+
+function getBalance($address, $contract){
+    return getNumber($address, $contract, '0x70a08231');
+    
+}
+
+function getNTBalance($address, $contract){
+    return getNumber($address, $contract, '0xae261aba');
+}
+
+function getCMBalance($address, $contract){
+    return getNumber($address, $contract, '0xbbc72a17');
+}
+
+function getCMLimitM($address, $contract){
+    return getNumber($address, $contract, '0xcc885a65');
+}
+
+function getCMLimitP($address, $contract){
+    return getNumber($address, $contract, '0xae7143d6');
 }
 
 
