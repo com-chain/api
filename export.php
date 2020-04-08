@@ -43,7 +43,7 @@ $full_set_row = [];
 foreach ($full_set_row_com as $row) {
     array_push($full_set_row, $row);
 }
-
+/*
 // Pending trans
 $query = "select * from testtransactions WHERE add1 = ? AND status = 1 AND time >= $start AND time <= $end ORDER by time";
 $full_set_row_pending = $session->execute(new Cassandra\SimpleStatement($query), $options);
@@ -74,7 +74,7 @@ usort($full_set_row, function($a, $b) {
             return 1;
         }
     });
-
+*/
 
 $line_ct = 0;
 $jstring=[];

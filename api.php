@@ -369,69 +369,188 @@ function sendRawTransaction($rawtx,$gethRPC){
     $transfert_NA_functions = ['a5f7c148','58258353','1b6b1ee5','132019f4'];
     $transfert_CM_functions = ['60ca9c4c','2ef9ade2','74c421fe','1415707c'];
     $transfert_functs =  array_merge($transfert_NA_functions,$transfert_CM_functions);
-     
+    
+    $lock_error = 'Account_Locked_Error';
+   
     try {
-        $tr_info = substr($rawtx,-316,182);
-        //get the type of transfert
-        $funct_address = strtolower(substr($tr_info,46,8));
-        // get the sender
-        $sender = TransactionEcRecover($rawtx)[0];
-        // get the contract for the balances
-        $contract = getContract1(substr($tr_info,0,40));
-  
+    
+        // length input 2 vs 3 x64
+        $is_f2 = false;
+        $is_f3 = false;
+        if (strlen($rawtx)>316 && substr($rawtx,-274,4) == 'b844'){
+            $is_f2 = true;
+        } else if (strlen($rawtx)>380  && substr($rawtx,-338,4) == 'b864'){
+            $is_f3 = true;
+        }
+        
+        
         $need_pending = false;
         $amount = 0;
         $trans_type = '';
-        if (in_my_array($funct_address, $transfert_functs)) {
+        $from_add = '';
+        $to_add = '';
+        $dbg ='';
+        if ($is_f3){
+            $tr_info = substr($rawtx,-380,246);
+            //get the type of transfert
+            $funct_address = strtolower(substr($tr_info,46,8));
+            // get the sender
+            $sender = TransactionEcRecover($rawtx)[0];
+            // get the contract for the balances
+            $contract = getContract1(substr($tr_info,0,40));
+            $contract2 = '0x'.substr($tr_info,0,40);
+            
+             if ($funct_address==$transfert_NA_functions[2] || $funct_address==$transfert_CM_functions[2]) {
+                // Transfert On Behalf 
+            
+                // get the account debited
+                $from_add = '0x'.substr($tr_info,78,40);
+                // get the dest.
+                $to_add = '0x'.substr($tr_info,142,40);
+                // get the amount
+                $amount = hexdec(substr($tr_info,-64));
 
-            if ($funct_address==$transfert_NA_functions[0] || $funct_address==$transfert_CM_functions[0]) {
-                // Direct Transfert
+                // get the infos   
+                $from_status = getAccStatus($from_add, $contract);
+                $to_status = getAccStatus($to_add, $contract);
+                
                  
-                // get the dest
+                $from_Nt_bal = getNTBalance($from_add, $contract);
+                $from_Cm_bal = getCMBalance($from_add, $contract);
+                $from_Cm_lim_m = getCMLimitM($from_add, $contract);
+                
+                $to_Cm_bal = getCMBalance($to_add, $contract);
+                $to_Cm_lim_p = getCMLimitP($to_add, $contract);
+                
+                if ($from_status==1 && $to_status==1){
+                    // Check delegation exists and is above amount
+                    $delegation_amount = getNumberInMap($from_add, $sender, $contract2, '0x046d3307');  // Address order OK
+                    
+                     
+                    $check_passed = $delegation_amount>=$amount;
+                    
+                    // Check transaction is possible
+                    if ($funct_address==$transfert_NA_functions[2]) {  // Nanti
+                        $check_passed &= $from_Nt_bal>=$amount;
+                        $trans_type = 'Transfer';
+                    } else if ($funct_address==$transfert_CM_functions[2]) { // Mutual Credit
+                        // dest can accept amount
+                        $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
+                        // sender has credit 
+                        $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
+                        $trans_type = 'TransferCredit';
+                    } else {
+                        $check_passed = false;
+                    }
+                    
+                    $need_pending = $check_passed;
+                } else {  
+                    throw new Exception($lock_error);
+                }
+            }
+        } else if ($is_f2){
+            $tr_info = substr($rawtx,-316,182);
+            //get the type of transfert
+            $funct_address = strtolower(substr($tr_info,46,8));
+            // get the sender
+            $sender = TransactionEcRecover($rawtx)[0];
+            // get the contract for the balances
+            $contract = getContract1(substr($tr_info,0,40));
+            $contract2 = '0x'.substr($tr_info,0,40);
+            
+            
+            if (in_my_array($funct_address, $transfert_functs)) {
+                 // get the dest
                 $dest = '0x'.substr($tr_info,78,40);
                 // get the amount
                 $amount = hexdec(substr($tr_info,-64));
-                //get the type of transfert
-                $funct_address = substr($tr_info,46,8);
                 
-                // get the infos 
                 $from_status = getAccStatus($sender, $contract);
-                $from_Nt_bal = getNTBalance($sender, $contract);
-                $from_Cm_bal = getCMBalance($sender, $contract);
-                $from_Cm_lim_m = getCMLimitM($sender, $contract);
-                
-                $to_status = getAccStatus($dest, $contract);
-                $to_Cm_bal = getCMBalance($dest, $contract);
-                $to_Cm_lim_p = getCMLimitP($dest, $contract);
-                
-                $check_passed = $from_status==1 && $to_status==1;
-                
-                // Check transaction is possible
-                if ($funct_address==$transfert_NA_functions[0]) {  // Nanti
-                    $check_passed &= $from_Nt_bal>=$amount;
-                    $trans_type = 'Transfer';
-                } else if ($funct_address==$transfert_CM_functions[0]) { // Mutual Credit
-                    // dest can accept amount
-                    $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
-                    // sender has credit 
-                    $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
-                    $trans_type = 'TransferCredit';
+                $to_status = getAccStatus($dest, $contract); 
+                if ($from_status==1 && $to_status==1) {
+                    if ($funct_address==$transfert_NA_functions[0] || 
+                        $funct_address==$transfert_CM_functions[0] || 
+                        $funct_address==$transfert_NA_functions[3] || 
+                        $funct_address==$transfert_CM_functions[3]) {
+                        // Direct Transfert and Accept reqest
+
+                        $from_add = $sender;
+                        $to_add = $dest;                       
+                        
+                        // get the infos 
+                        
+                        $from_Nt_bal = getNTBalance($sender, $contract);
+                        $from_Cm_bal = getCMBalance($sender, $contract);
+                        $from_Cm_lim_m = getCMLimitM($sender, $contract);
+                        
+                        $to_Cm_bal = getCMBalance($dest, $contract);
+                        $to_Cm_lim_p = getCMLimitP($dest, $contract);
+                        
+                        $check_passed = true;
+
+                        // Check request exists and amount is not bigger than expected 
+                        if ($funct_address==$transfert_NA_functions[3] || $funct_address==$transfert_CM_functions[3]){
+                            $request_amount = getNumberInMap( $sender, $dest, $contract2, '0x3537d3fa');   //ok address order
+                            $check_passed = $request_amount>=$amount;
+                        }
+                        
+                        // Check transaction is possible
+                        if ($funct_address==$transfert_NA_functions[0] || $funct_address==$transfert_NA_functions[3]) {  // Nanti
+                            $check_passed &= $from_Nt_bal>=$amount;
+                            $trans_type = 'Transfer';
+                        } else if ($funct_address==$transfert_CM_functions[0] || $funct_address==$transfert_CM_functions[3]) { // Mutual Credit
+                            // dest can accept amount
+                            $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
+                            // sender has credit 
+                            $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
+                            $trans_type = 'TransferCredit';
+                        } else {
+                            $check_passed = false;
+                        }
+                        $need_pending = $check_passed;
+                    } else if ($funct_address==$transfert_NA_functions[1] || $funct_address==$transfert_CM_functions[1]) {
+                        // Transfert from 
+                        $requestor = $sender;
+                        $requested = $dest;
+                        
+                        $from_add = $dest;
+                        $to_add = $sender; 
+                        
+                        $from_Nt_bal = getNTBalance($requested, $contract);
+                        $from_Cm_bal = getCMBalance($requested, $contract);
+                        $from_Cm_lim_m = getCMLimitM($requested, $contract);
+                        
+                        $to_Cm_bal = getCMBalance($requestor, $contract);
+                        $to_Cm_lim_p = getCMLimitP($requestor, $contract);
+                        
+                        $check_passed = true;
+                        // check autorisation exists and is above amount
+                        $allowance_amount = getNumberInMap($requested, $requestor, $contract2, '0xdd62ed3e');  //address order ok
+                        $check_passed = $allowance_amount>=$amount;
+                        
+                        // Check transaction is possible
+                        if ($funct_address==$transfert_NA_functions[1]) {  // Nanti
+                            $check_passed &= $from_Nt_bal>=$amount;
+                            $trans_type = 'Transfer';
+                        } else if ($funct_address==$transfert_CM_functions[1]) { // Mutual Credit
+                            // dest can accept amount
+                            $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
+                            // sender has credit 
+                            $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
+                            $trans_type = 'TransferCredit';
+                        } else {
+                            $check_passed = false;
+                        }
+                        $need_pending = $check_passed;
+                    } 
                 } else {
-                    $check_passed = false;
+                    throw new Exception($lock_error);
                 }
-                $need_pending = $check_passed;
-            } else if ($funct_address==$transfert_NA_functions[1] || $funct_address==$transfert_CM_functions[1]) {
-                // Transfert from 
-                // TODO
-            } else if ($funct_address==$transfert_NA_functions[2] || $funct_address==$transfert_CM_functions[2]) {
-                // Transfert On Behalf 
-                // TODO
-            } else if ($funct_address==$transfert_NA_functions[3] || $funct_address==$transfert_CM_functions[3]) {
-                // Accept reqest
-                // TODO
+            
             }
-        
+                 
         }
+    
           
         $data['data'] = getRPCResponse($gethRPC->eth_sendRawTransaction($rawtx));
         
@@ -441,7 +560,7 @@ function sendRawTransaction($rawtx,$gethRPC){
             $wh_status = 1;
         }
         
-        if (strlen($shop_url)>0 && $amount > 0) {
+        if ($need_pending && strlen($shop_url)>0 && $amount > 0) {
             $message = createWebhookMessage($data['data'], $_REQUEST['serverName'], 
                                                 $_REQUEST['shopId'], $_REQUEST['txId'], 
                                                 $sender, $rawtx); 
@@ -451,12 +570,11 @@ function sendRawTransaction($rawtx,$gethRPC){
                 } else {
                     $wh_status = 2;
                 }
-        
         }
         storeAdditionalData(strlen($shop_url)>0, $data['data'], $wh_status);
         
         if ($need_pending) {
-            storeTransaction(strlen($shop_url)>0, $data['data'], $wh_status, $amount, $sender, $dest, $trans_type); 
+            storeTransaction(strlen($shop_url)>0, $data['data'], $wh_status, $amount, $from_add, $to_add, $trans_type); 
         }
        
     } catch (exception $e) {
@@ -464,6 +582,7 @@ function sendRawTransaction($rawtx,$gethRPC){
         $data['msg'] = $e->getMessage();
     }
     
+    //$data['dbg']= $dbg;
     return json_encode($data);
     
 }

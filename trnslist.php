@@ -44,7 +44,9 @@ foreach ($full_set_row_com as $row) {
 }
 
 // Pending trans
-$query = "select * from testtransactions WHERE add1 = ? AND status = 1 ORDER BY time DESC limit $counter;";
+$query = "select * from testtransactions WHERE add1 = ? AND status = 1 and time>=".(time()-3600)." ORDER BY time DESC limit $counter;";
+
+$options = array('arguments' => array($addr));
 $full_set_row_pending = $session->execute(new Cassandra\SimpleStatement($query), $options);
 
 
