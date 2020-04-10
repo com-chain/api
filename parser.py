@@ -158,9 +158,9 @@ for line in sys.stdin:
 		transSent = transaction['sent']
 	except:
 		transSent = transaction['recieved']
-		#print("Error sent:")
-		#print(transaction)
 		
+
+    # TODO: check for negatite values and convert them
 	try:
 		transTax = transaction['tax']
 	except:
