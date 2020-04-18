@@ -26,6 +26,7 @@ import sys
 import traceback
 import warnings
 import webbrowser
+import datetime
 from StringIO import StringIO
 from contextlib import contextmanager
 from glob import glob
@@ -207,11 +208,13 @@ for line in sys.stdin:
 	        if wh_status>1: # 2 failed attempt / 3 success
 	            nb_attempt ='1'
 	        additional_fields.append('wh_status')
-	        additional_values.append(status) # New shop transction 
+	        additional_values.append(str(wh_status)) # New shop transction 
 	        additional_fields.append('tr_attempt_nb')
 	        additional_values.append(nb_attempt) 
 	        additional_fields.append('tr_attempt_date')
-	        additional_values.append("'{}'".format(row.stamp-10800000)) 
+	        diff = row.stamp - datetime.datetime(1970, 1, 1)
+	        timestamp = int(diff.total_seconds())
+	        additional_values.append("'{}'".format(str(timestamp-10800000))) 
         
 	if not shop_tx:
 	    additional_fields.append('wh_status')

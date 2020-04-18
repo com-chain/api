@@ -23,7 +23,7 @@ class MyLiteDB extends SQLite3 {
       }
       
       
-      public function getMessages($txId) {
+      public function getMessage($txId) {
         $sql ='SELECT amount, txId FROM WebHookMessage WHERE txId=\''.$txId.'\'';
         $ret = $this->query($sql);
         while($row = $ret->fetchArray(SQLITE3_ASSOC) ){
@@ -32,23 +32,43 @@ class MyLiteDB extends SQLite3 {
         
         return [];
       }
+      public function getMessages() {
+        $sql ='SELECT amount, txId FROM WebHookMessage';
+        $ret = $this->query($sql);
+        $rows = [];
+        while($row = $ret->fetchArray(SQLITE3_ASSOC) ){
+            $rows[]=$row;
+        }
+        return $rows;
+      }
 }
 
  $db = new MyLiteDB();
 
-if (isset($_GET['cleanMessage'])) {
+if (isset($_GET['cleanMessages'])) {
 
     $db->clearMessage();
 }
 
-
-if (isset($_GET['txId'])) {
-    //DBG 
-    //echo json_encode(["amount"=>0.02, "txId"=>$_GET['txId']]);
-    echo json_encode($db->getMessages($txId));
+if (isset($_GET['allMessages'])) {
+    foreach ($db->getMessages() as $row ){
+        echo json_encode($row).'<br/>';
+    }
 }
 
-if (isset($_POST['resources'])){}
-// TODO put webhook message in DB
+
+if (isset($_GET['txId'])) {
+    echo json_encode($db->getMessage($_GET['txId']));
+}
+
+if (isset($_POST['resources'])){
+    // minimal data cherry picking: DO NOT USE AS IT! you need (at least) to check:
+    //  - message signature (in the HTTP Header) check 
+    //  - that the dest. account (addr_to) is the right one
+    
+    $amount = $_POST['resources']['amount'];
+    $txId = $_POST['resources']['reference'];
+    $db->insertMessage($amount,$txId);
+}
 
 ?>

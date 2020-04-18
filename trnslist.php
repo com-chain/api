@@ -90,7 +90,6 @@ foreach ($full_set_row as $row) {
     
     $row['time'] = $row['time']->value();
     
-    $row['dbg'] = sizeof($full_set_row_pending);
 
     $jstring[$line_ct] = json_encode($row);
     $line_ct++;

@@ -26,7 +26,7 @@ CREATE TABLE comchain.testtransactions (
   tr_attempt_date text,
   tr_attempt_nb int,
   wh_status int,
-  PRIMARY KEY ((add1,status), time) )
+  PRIMARY KEY ((add1,status), time, hash) )
   WITH  CLUSTERING ORDER BY (time ASC) ;
   
 CREATE INDEX ON comchain.testtransactions (hash);

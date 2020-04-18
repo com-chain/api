@@ -176,15 +176,16 @@ function validateShop($shop_id, $server_name){
    $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")->build();
    $keyspace  = 'comchain';
    $session  = $cluster->connect($keyspace);
-   $query = "SELECT webhook_url FROM sellers WHERE store_id = ? AND server_name = ? "; 
-   $options = array('arguments' => array($shop_id, $server_name)); 
+   $query = "SELECT webhook_url, server_name FROM sellers WHERE store_id = ? "; 
+   $options = array('arguments' => array($shop_id)); 
    foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
-	 return $row['webhook_url'];
+      if ($row['server_name']==$server_name){
+	    return $row['webhook_url'];
+      }
    }
    
    return "";
 }
-
 
 
 function validateShopData() {
@@ -563,13 +564,14 @@ function sendRawTransaction($rawtx,$gethRPC){
         if ($need_pending && strlen($shop_url)>0 && $amount > 0) {
             $message = createWebhookMessage($data['data'], $_REQUEST['serverName'], 
                                                 $_REQUEST['shopId'], $_REQUEST['txId'], 
-                                                $sender, $rawtx); 
-                $res = sendWebhook($shop_url, $message);
-                if ($res) {
-                    $wh_status = 3;
-                } else {
-                    $wh_status = 2;
-                }
+                                                $trans_type, $from_add, $to_add, $amount); 
+                                                
+            $res = sendWebhook($shop_url, $message);
+            if ($res) {
+                $wh_status = 3;
+            } else {
+                $wh_status = 2;
+            }
         }
         storeAdditionalData(strlen($shop_url)>0, $data['data'], $wh_status);
         
