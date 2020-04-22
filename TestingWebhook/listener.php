@@ -2,7 +2,7 @@
 
 class MyLiteDB extends SQLite3 {
       function __construct() {
-         $this->open('./webhookMessage.db');
+         $this->open('./db/webhookMessage.db');
          
          $sql = "CREATE TABLE IF NOT EXISTS WebHookMessage (amount TEXT  NOT NULL, txId TEXT)";
          $this->query($sql);
@@ -43,32 +43,27 @@ class MyLiteDB extends SQLite3 {
       }
 }
 
+
  $db = new MyLiteDB();
 
 if (isset($_GET['cleanMessages'])) {
 
     $db->clearMessage();
-}
-
-if (isset($_GET['allMessages'])) {
+} else if (isset($_GET['allMessages'])) {
     foreach ($db->getMessages() as $row ){
         echo json_encode($row).'<br/>';
     }
-}
-
-
-if (isset($_GET['txId'])) {
+} else if (isset($_GET['txId'])) {
     echo json_encode($db->getMessage($_GET['txId']));
-}
-
-if (isset($_POST['resources'])){
+} else {
+  if (isset($_POST['resources'])){
     // minimal data cherry picking: DO NOT USE AS IT! you need (at least) to check:
     //  - message signature (in the HTTP Header) check 
     //  - that the dest. account (addr_to) is the right one
     
-    $amount = $_POST['resources']['amount'];
+    $amount = intval($_POST['resources']['amount']['sent'])/100;
     $txId = $_POST['resources']['reference'];
-    $db->insertMessage($amount,$txId);
+    $db->insertMessage($amount, $txId);
+  }
 }
-
 ?>

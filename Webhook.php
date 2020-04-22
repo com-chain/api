@@ -63,24 +63,24 @@ function sendWebhook($url, $message) {
     $json_message = json_encode($message);
     $hash = crc32($json_message);
     $sign = "";
-    
-    $sign_key = openssl_pkey_get_private(file_get_contents($filename));
+    $sign_key = openssl_pkey_get_private(file_get_contents($private_key_path));
     if (openssl_sign($hash, $sign, $sign_key)) {
         $signed = base64_encode($sign);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-type: application/json', 
-                                                   'COMCHAIN-TRANSMISSION-SIG:'.$signed, 
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('COMCHAIN-TRANSMISSION-SIG:'.$signed, 
                                                    'COMCHAIN-AUTH-ALGO:RSA',
                                                    'COMCHAIN-CERT-URL:'.$public_key_url));
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_HEADER, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $message);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($message));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
         $passed=true;
-        curl_exec( $ch );
-         
+        if (!$response = curl_exec( $ch )){
+             $passed=false;
+        }
+        
         
         if ($passed) {
            $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
