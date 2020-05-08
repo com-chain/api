@@ -78,11 +78,45 @@ function getAccStatus($address, $contract){
     return substr($data,-1);
 }
 
-function getBalance($address, $contract){
+
+
+function getNumber($address, $contract, $function){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
     $ethCall = ['to' =>$contract, 
-                'data' => '0x70a08231000000000000000000000000'.substr($address,2)
+                'data' => $function.'000000000000000000000000'.substr($address,2)
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'};
+    
+    $data = '0x'.substr($data,-12);
+    $val = hexdec($data);
+    
+    if ($val>(34359738368*4096)){
+            $val=$val-68719476736*4096;
+    }
+    
+    return $val;
+}
+
+function getNumberInMap($address1, $addresse2, $contract, $function){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => $function.'000000000000000000000000'.substr($address1,2).'000000000000000000000000'.substr($addresse2,2)
                ];
     $fields = ['ethCall'=>$ethCall];
     $fields_string = http_build_query($fields);
@@ -101,6 +135,27 @@ function getBalance($address, $contract){
     $data= $json->{'data'}; 
     
     return hexdec($data);
+}
+
+function getBalance($address, $contract){
+    return getNumber($address, $contract, '0x70a08231');
+    
+}
+
+function getNTBalance($address, $contract){
+    return getNumber($address, $contract, '0xae261aba');
+}
+
+function getCMBalance($address, $contract){
+    return getNumber($address, $contract, '0xbbc72a17');
+}
+
+function getCMLimitM($address, $contract){
+    return getNumber($address, $contract, '0xcc885a65');
+}
+
+function getCMLimitP($address, $contract){
+    return getNumber($address, $contract, '0xae7143d6');
 }
 
 

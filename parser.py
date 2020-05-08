@@ -26,6 +26,7 @@ import sys
 import traceback
 import warnings
 import webbrowser
+import datetime
 from StringIO import StringIO
 from contextlib import contextmanager
 from glob import glob
@@ -150,10 +151,17 @@ for line in sys.stdin:
 		transRecieved = transaction['recieved']
 	except:
 		transRecieved = transaction['value']
+		print("Error recieved:")
+		print(transaction)
+
+
 	try:
-		transSent = transaction['send']
+		transSent = transaction['sent']
 	except:
 		transSent = transaction['recieved']
+		
+
+    # TODO: check for negatite values and convert them
 	try:
 		transTax = transaction['tax']
 	except:
@@ -161,16 +169,8 @@ for line in sys.stdin:
 	transEvent = data['event']
 	transHash = data['transactionHash']
 	transBlock = str(data['blockNumber'])
-	transId = transTime + transHash
-	addrJson = "{'from':'" + transFrom + "','to':'" + transTo + "'}"
-	#valueJson = "{'recevied':" + transRecieved + ",'sent':" + transSent + ",'tax':" + transTax + "}"
-
-	print transTime + " - Added transaction " + transHash + " from block " + transBlock
 	
-	# insert the correspondance table between the transaction hash and the address
-	cqlInsertHash = "INSERT INTO trans_by_addr (hash, addr) VALUES ('{}', {})".format(transHash, addrJson)
-	print(cqlInsertHash)
-	session.execute(cqlInsertHash)
+	print transTime + " - Added transaction " + transHash + " from block " + transBlock
 	
 	# Check if the transaction is in the pending transaction table (webshop_transactions)
 	cqlcommand = "SELECT hash, store_id, store_ref, wh_status, delegate , message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
@@ -178,7 +178,6 @@ for line in sys.stdin:
 	additional_fields = []
 	additional_values = []
 	shop_tx = False
-	
 	
 	for row in rows:	    
 	    # message
@@ -204,36 +203,44 @@ for line in sys.stdin:
 	        additional_fields.append('store_ref')
 	        additional_values.append("'{}'".format(row.store_ref))  
 	        
-	        status = row.wh_status
+	        wh_status = row.wh_status
 	        nb_attempt ='0'
-	        if status>1: # 2 failed attempt / 3 success
+	        if wh_status>1: # 2 failed attempt / 3 success
 	            nb_attempt ='1'
-	        additional_fields.append('status')
-	        additional_values.append(status) # New shop transction 
+	        additional_fields.append('wh_status')
+	        additional_values.append(str(wh_status)) # New shop transction 
 	        additional_fields.append('tr_attempt_nb')
 	        additional_values.append(nb_attempt) 
 	        additional_fields.append('tr_attempt_date')
-	        additional_values.append("'{}'".format(row.stamp-10800000)) 
+	        diff = row.stamp - datetime.datetime(1970, 1, 1)
+	        timestamp = int(diff.total_seconds())
+	        additional_values.append("'{}'".format(str(timestamp-10800000))) 
         
 	if not shop_tx:
-	    additional_fields.append('status')
+	    additional_fields.append('wh_status')
             additional_values.append('0') # Not a shop transction
 
+	add_fields = ', '.join(additional_fields)
+	add_val =  ', '.join(additional_values)
+	cqlcommand = "INSERT INTO testtransactions (add1, add2, status, hash, time, direction, recieved, sent, tax, type, block, {}) VALUES ('{}', '{}',     {},  '{}',  {},        {},       {},   {},  {}, '{}',    '{}', {}) IF NOT EXISTS"
+	cqlcommand_1 = cqlcommand.format(add_fields, transFrom, transTo, 0, transHash, transTime, 1, transRecieved, transSent, transTax, transEvent, transBlock, add_val )
+	cqlcommand_2 = cqlcommand.format(add_fields, transTo, transFrom, 0, transHash, transTime, 2, transRecieved, transSent, transTax, transEvent, transBlock, add_val )
 	
-	if len(additional_fields)>0:
-	    add_fields = ', '.join(additional_fields)
-	    add_val =  ', '.join(additional_values)
-        cqlcommand = "INSERT INTO transactions (hash, block, recieved, sent, tax, time, type, addr_from, addr_to, {}) VALUES ('{}', '{}', {}, {}, {}, '{}', '{}', '{}','{}', {}) IF NOT EXISTS".format(add_fields,transHash, transBlock, transRecieved, transSent, transTax, transTime, transEvent, transFrom, transTo, add_val )
-	
-	print(cqlcommand)
-	session.execute(cqlcommand)
-	
-	# Clear the webshop_transactions
-	#cqlcommand = "DELETE FROM  webshop_transactions WHERE hash='{}'".format(transHash)
-	#rows = sessioStaging.execute(cqlcommand)
+	try:
+		session.execute(cqlcommand_1)
+	#print(cqlcommand_1)
+	except:
+		print("Error Executing:" + cqlcommand_1)
+    
+	try:
+		session.execute(cqlcommand_2)
+	#print(cqlcommand_2)
+	except:
+		print("Error Executing:" + cqlcommand_2)
 
+	
 # send webhook for the newly inserted transactions	
-if has_some_shop_tx:
-    processWebhookTransaction(True)
+#if has_some_shop_tx:
+#    processWebhookTransaction(True)
 	
 	
