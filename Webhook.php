@@ -18,7 +18,7 @@ function createWebhookMessage($tr_hash, $server_name, $store_id, $store_ref, $ty
                   );
              
     $amount = array ( 
-                        'sent'=> $amount,
+                        'sent'=> "".$amount,
                         'type'=> $type_tr,
                         'currency' => $server_name
                     );
@@ -26,7 +26,7 @@ function createWebhookMessage($tr_hash, $server_name, $store_id, $store_ref, $ty
              
     $resources = array (
                   'id'=>$tr_hash,
-                  'create_time'=> $time,
+                  'create_time'=> "".$time,
                   'state'=>'completed',
                   'store_id' => $store_id,
                   'reference' => $store_ref,
@@ -41,7 +41,7 @@ function createWebhookMessage($tr_hash, $server_name, $store_id, $store_ref, $ty
              
     
     $data = array ('id'=>$tr_hash,
-             'create_time'=>$time, 
+             'create_time'=>"".$time, 
              'resource_type'=>'sale', 
              'event_type'=> 'PAYMENT.SALE.COMPLETED',
              'summary'=>'A sale has been completed. The payement has been processed.',
@@ -88,6 +88,7 @@ function sendWebhook($url, $message) {
         }
         
         curl_close($ch);
+
         return $passed;
     } else {
         return false;
