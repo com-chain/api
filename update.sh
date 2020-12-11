@@ -2,9 +2,14 @@
 cd /home/ethereum
 while true
 do
+  # if geth is not running, wait, checking every min
+  while [ ! -e .ethereum/geth.ipc ]
+  do
+    sleep 60 # or less like 0.2
+  done
 lastBlock=`geth --exec "eth.blockNumber" attach`
 firstBlock=`cat block.txt`
-if [ $lastBlock -gt $firstBlock ] 
+if [ $lastBlock -ge $firstBlock ] 
 then
 	echo "Parsing $firstBlock - $lastBlock"
 	cat logtodb.TMPL | sed s/LBLOCK/$lastBlock/g | sed s/FBLOCK/$firstBlock/g > logtodb
