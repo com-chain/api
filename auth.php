@@ -73,7 +73,7 @@ if ($user['addr'] == $signingAddr){
 FUNCTIONS
 */
 function createChallenge($addr, $session) {
-    challenge = random_str(25);
+    $challenge = random_str(25);
     $query = "INSERT INTO challenges (addr, challenge) VALUES ('$addr', '$challenge')";
     $session->execute(new Cassandra\SimpleStatement($query));
 	$arrayLogin['Challenge'] = $challenge; 
