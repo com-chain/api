@@ -6,7 +6,12 @@ header('Access-Control-Allow-Origin: *');
 
 // connect to ipfs daemon API server
 $ipfs = new IPFS("localhost", "8080", "5001");
-$arr['hash'] = $ipfs->add($_GET['data']);
+$arr = []; 
+if (isset($_GET['data'])) {
+    $arr['hash'] = $ipfs->add($_GET['data']);
+} else if (isset($_POST['data'])) {
+    $arr['hash'] = $ipfs->add($_POST['data']);
+}
 
 print json_encode($arr);
 ?>
