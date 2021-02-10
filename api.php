@@ -43,6 +43,21 @@ function blockNumber($gethRPC){
     }
     return $block;
 }
+
+
+function getEstimatedGas($txobj, $gethRPC){
+    $data = getDefaultResponse();
+    try {
+        $data['data'] = getRPCResponse($gethRPC->eth_estimateGas($txobj));
+    }
+    catch (exception $e) {
+        $data['error'] = true;
+        $data['msg'] = $e->getMessage();
+    }
+    return json_encode($data);
+}
+
+
 function getTransaction($hash, $gethRPC){
     $data = getDefaultResponse();
     try {
@@ -68,7 +83,6 @@ function getTransaction($hash, $gethRPC){
 	    }
 	    
 	    
-	    
         $arr['transaction'] = $ret;
         $ret = json_encode($arr);
         $data = $ret;
@@ -79,17 +93,7 @@ function getTransaction($hash, $gethRPC){
     }
     return json_encode($data);
 }
-function getEstimatedGas($txobj, $gethRPC){
-    $data = getDefaultResponse();
-    try {
-        $data['data'] = getRPCResponse($gethRPC->eth_estimateGas($txobj));
-    }
-    catch (exception $e) {
-        $data['error'] = true;
-        $data['msg'] = $e->getMessage();
-    }
-    return json_encode($data);
-}
+
 
 
 
@@ -372,6 +376,7 @@ function sendRawTransaction($rawtx,$gethRPC){
     $transfert_functs =  array_merge($transfert_NA_functions,$transfert_CM_functions);
     
     $lock_error = 'Account_Locked_Error';
+    $amount_error = 'Incompatible_Amount';
    
     try {
     
@@ -445,6 +450,9 @@ function sendRawTransaction($rawtx,$gethRPC){
                     }
                     
                     $need_pending = $check_passed;
+                    if (!$check_passed) {
+                        throw new Exception($amount_error);
+                    }
                 } else {  
                     throw new Exception($lock_error);
                 }
@@ -501,14 +509,17 @@ function sendRawTransaction($rawtx,$gethRPC){
                             $trans_type = 'Transfer';
                         } else if ($funct_address==$transfert_CM_functions[0] || $funct_address==$transfert_CM_functions[3]) { // Mutual Credit
                             // dest can accept amount
-                            $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
+                            $check_passed &= $to_Cm_bal + $amount <= $to_Cm_lim_p;
                             // sender has credit 
-                            $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
+                            $check_passed &=$from_Cm_bal-$amount >= $from_Cm_lim_m;
                             $trans_type = 'TransferCredit';
                         } else {
                             $check_passed = false;
                         }
                         $need_pending = $check_passed;
+                        if (!$check_passed) {
+                            throw new Exception($amount_error);
+                        }
                     } else if ($funct_address==$transfert_NA_functions[1] || $funct_address==$transfert_CM_functions[1]) {
                         // Transfert from 
                         $requestor = $sender;
@@ -535,14 +546,17 @@ function sendRawTransaction($rawtx,$gethRPC){
                             $trans_type = 'Transfer';
                         } else if ($funct_address==$transfert_CM_functions[1]) { // Mutual Credit
                             // dest can accept amount
-                            $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
+                            $check_passed &= $to_Cm_bal + $amount <= $to_Cm_lim_p;
                             // sender has credit 
-                            $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
+                            $check_passed &=$from_Cm_bal-$amount >= $from_Cm_lim_m;
                             $trans_type = 'TransferCredit';
                         } else {
                             $check_passed = false;
                         }
                         $need_pending = $check_passed;
+                        if (!$check_passed) {
+                            throw new Exception($amount_error);
+                        }
                     } 
                 } else {
                     throw new Exception($lock_error);
