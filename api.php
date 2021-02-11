@@ -554,9 +554,6 @@ function sendRawTransaction($rawtx,$gethRPC){
                             $check_passed = false;
                         }
                         $need_pending = $check_passed;
-                        if (!$check_passed) {
-                            throw new Exception($amount_error);
-                        }
                     } 
                 } else {
                     throw new Exception($lock_error);
