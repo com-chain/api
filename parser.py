@@ -55,7 +55,7 @@ for line in sys.stdin:
 	print(str(transTime) + " - Added transaction " + transHash + " from block " + transBlock)
 	
 	# Check if the transaction is in the pending transaction table (webshop_transactions)
-	cqlcommand = "SELECT hash, store_id, store_ref, wh_status, delegate, message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
+	cqlcommand = "SELECT hash, store_id, store_ref, wh_status, delegate, linked_hash, message_from, message_to, toTimestamp(now()) AS stamp FROM webshop_transactions WHERE hash='{}'".format(transHash)
 	rows = sessioStaging.execute(cqlcommand)
 	additional_fields = []
 	additional_values = []
