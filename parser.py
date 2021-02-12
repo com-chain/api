@@ -75,6 +75,12 @@ for line in sys.stdin:
 	         additional_fields.append('delegate')
 	         additional_values.append("'{}'".format(row.delegate)) 
 	         
+	    
+	    # parent transaction
+	    if hasattr(row, 'linked_hash')  and row.linked_hash is not None:
+	         additional_fields.append('linked_hash')
+	         additional_values.append("'{}'".format(row.linked_hash)) 
+	         
 	    # webshop
 	    if hasattr(row, 'store_id')  and row.store_id is not None: # this is a webshop transaction
 	        shop_tx = True

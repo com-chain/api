@@ -229,6 +229,11 @@ function storeAdditionalData($is_valid_shop, $transaction_ash, $web_hook_status)
         $val[]='?';    
     }
     
+    if (isset($parent_hash)) {
+        $fields['linked_hash'] = $parent_hash;
+        $val[]='?';    
+    }
+    
     if (isset($memo_from) && $memo_from!="") {
         $fields['message_from'] = $memo_from;
         $val[]='?';    
