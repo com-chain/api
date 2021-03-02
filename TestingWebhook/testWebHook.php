@@ -60,7 +60,7 @@ echo'</body>
           useSVG: true
       });
 
-     qrcode.makeCode("https://v2.cchosting.org/index.html?address='.$address.'&amount='.$amount.'&shopId='.$shopId.'&txId='.urlencode($tx_id).'&serverName='.$serverName.'");
+     qrcode.makeCode("{\"address\":\"'.$address.'\", \"amount\":\"'.$amount.'\",\"shopId\":\"'.$shopId.'\",\"txId\":\"'.urlencode($tx_id).'\",\"serverName\":\"'.$serverName.'\"}");
     </script>
     
     <script type="text/javascript">
