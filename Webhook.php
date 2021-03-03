@@ -66,28 +66,33 @@ function sendWebhook($url, $message) {
     $sign_key = openssl_pkey_get_private(file_get_contents($private_key_path));
     if (openssl_sign($hash, $sign, $sign_key)) {
         $signed = base64_encode($sign);
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('COMCHAIN-TRANSMISSION-SIG:'.$signed, 
-                                                   'COMCHAIN-AUTH-ALGO:RSA',
-                                                   'COMCHAIN-CERT-URL:'.$public_key_url));
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_HEADER, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($message));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
+        $url_list = explode(",", $url);
         $passed=true;
-        if (!$response = curl_exec( $ch )){
-             $passed=false;
+        for ($url_list as $send_url) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $send_url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array('COMCHAIN-TRANSMISSION-SIG:'.$signed, 
+                                                       'COMCHAIN-AUTH-ALGO:RSA',
+                                                       'COMCHAIN-CERT-URL:'.$public_key_url));
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_HEADER, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($message));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+            
+            if (!$response = curl_exec( $ch )){
+                 $passed=false;
+            }
+            
+            
+            if ($passed) {
+               $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+               $passed = $code>=200 and $code<300;
+            }
+            
+            curl_close($ch);
         }
         
-        
-        if ($passed) {
-           $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-           $passed = $code>=200 and $code<300;
-        }
-        
-        curl_close($ch);
 
         return $passed;
     } else {
