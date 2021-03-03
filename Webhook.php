@@ -68,7 +68,7 @@ function sendWebhook($url, $message) {
         $signed = base64_encode($sign);
         $url_list = explode(",", $url);
         $passed=true;
-        for ($url_list as $send_url) {
+        foreach ($url_list as $send_url) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $send_url);
             curl_setopt($ch, CURLOPT_HTTPHEADER, array('COMCHAIN-TRANSMISSION-SIG:'.$signed, 
