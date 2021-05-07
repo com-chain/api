@@ -79,6 +79,11 @@ $tok = filter_var($data['token'], FILTER_SANITIZE_STRING);
 $token = base64url_decode($tok);
 $adresse = filter_var($data['adresse'], FILTER_SANITIZE_STRING);
 
+   
+
+
+
+
 $check_or_enroll = !isset($data['adresse']);
 
 
@@ -90,8 +95,14 @@ if ($pubkeyid!==false) {
         // Check validity 
         $result = checkSign($uid, $signature, $pubkeyid);
      } else {
-        // Add address
-        $result = saveAddress($uid, $token, $pubkeyid, $currency, $adresse, $maxAccounts);
+        // Check inputs
+        $adresse = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "",$adresse));
+        if (strlen($adresse) != 42) {
+	        $result = "KO";
+        } else {
+            // Add address
+            $result = saveAddress($uid, $token, $pubkeyid, $currency, $adresse, $maxAccounts);
+        }
      }
  
      openssl_free_key($pubkeyid);
