@@ -78,6 +78,7 @@ function sendWebhook($url, $message) {
             curl_setopt($ch, CURLOPT_HEADER, 1);
             curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($message));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
             
             if (!$response = curl_exec( $ch )){

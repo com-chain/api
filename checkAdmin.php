@@ -22,6 +22,7 @@ function getServerConfig($server){
     curl_setopt($ch, CURLOPT_URL, $url);
     // Set so curl_exec returns the result instead of outputting it.
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     // Get the response and close the channel.
     $response = curl_exec($ch);
     curl_close($ch);
@@ -43,6 +44,7 @@ function getAccType($address, $contract){
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, count($fields));
     curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     
     // Get the response and close the channel.
     $response = curl_exec($ch);
@@ -66,7 +68,8 @@ function getAccStatus($address, $contract){
     // Set so curl_exec returns the result instead of outputting it.
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, count($fields));
-    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $fields_string);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     
     // Get the response and close the channel.
     $response = curl_exec($ch);
@@ -94,6 +97,7 @@ function getNumber($address, $contract, $function){
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, count($fields));
     curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     
     // Get the response and close the channel.
     $response = curl_exec($ch);
@@ -126,6 +130,7 @@ function getNumberInMap($address1, $addresse2, $contract, $function){
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, count($fields));
     curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     
     // Get the response and close the channel.
     $response = curl_exec($ch);
