@@ -53,7 +53,7 @@ function saveAddress($uid, $token, $pubkeyid, $currency, $adresse, $maxAccounts)
 	if ($count < $maxAccounts) {
                         $dbg = $dbg.'count ok,';  
 		        $updateCount = "UPDATE $table SET Count=$count, Adresses=? WHERE Code=?";
-                $options = array('arguments' => array($add,$uid));
+                $options = array('arguments' => array($addr,$uid));
 		        if ($session->execute(new Cassandra\SimpleStatement($updateCount), $options)) {            
 		            $result = "OK";
                               
