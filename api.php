@@ -437,27 +437,36 @@ function sendRawTransaction($rawtx,$gethRPC){
                     // Check delegation exists and is above amount
                     $delegation_amount = getNumberInMap($from_add, $sender, $contract2, '0x046d3307');  // Address order OK
                     
-                     
-                    $check_passed = $delegation_amount>=$amount;
+                    if ($amount>$delegation_amount) {
+                        $data["data"] = "InsufficientDelegatedAmount";
+                        throw new Exception($amount_error);
+                    }
                     
                     // Check transaction is possible
                     if ($funct_address==$transfert_NA_functions[2]) {  // Nanti
-                        $check_passed &= $from_Nt_bal>=$amount;
+                        if ($amount>$from_Nt_bal) {
+                            $data["data"] = "InsufficientNantBalance";
+                            throw new Exception($amount_error);
+                        }
                         $trans_type = 'Transfer';
                     } else if ($funct_address==$transfert_CM_functions[2]) { // Mutual Credit
                         // dest can accept amount
-                        $check_passed &= $to_Cm_bal + $amount < $to_Cm_lim_p;
+                        if ($to_Cm_bal + $amount >= $to_Cm_lim_p) {
+                            $data["data"] = "ReceiverWouldHitCMLimitMax";
+                            throw new Exception($amount_error);
+                        }
                         // sender has credit 
-                        $check_passed &=$from_Cm_bal-$amount > $from_Cm_lim_m;
+                        if ($from_Cm_bal - $amount <= $from_Cm_lim_m) {
+                            $data["data"] = "SenderWouldHitCMLimitMin";
+                            throw new Exception($amount_error);
+                        }
                         $trans_type = 'TransferCredit';
                     } else {
-                        $check_passed = false;
-                    }
-                    
-                    $need_pending = $check_passed;
-                    if (!$check_passed) {
+                        $data["data"] = "UnexpectedTransferAddress";
                         throw new Exception($amount_error);
                     }
+
+                    $need_pending = true;
                 } else {  
                     throw new Exception($lock_error);
                 }
@@ -500,31 +509,40 @@ function sendRawTransaction($rawtx,$gethRPC){
                         $to_Cm_bal = getCMBalance($dest, $contract);
                         $to_Cm_lim_p = getCMLimitP($dest, $contract);
                         
-                        $check_passed = true;
-
                         // Check request exists and amount is not bigger than expected 
                         if ($funct_address==$transfert_NA_functions[3] || $funct_address==$transfert_CM_functions[3]){
                             $request_amount = getNumberInMap( $sender, $dest, $contract2, '0x3537d3fa');   //ok address order
-                            $check_passed = $request_amount>=$amount;
+
+                            if ($amount > $request_amount) {
+                                $data["data"] = "AmountBiggerThanRequested";
+                                throw new Exception($amount_error);
+                            }
                         }
                         
                         // Check transaction is possible
                         if ($funct_address==$transfert_NA_functions[0] || $funct_address==$transfert_NA_functions[3]) {  // Nanti
-                            $check_passed &= $from_Nt_bal>=$amount;
+                            if ($amount > $from_Nt_bal) {
+                                $data["data"] = "InsufficientNantBalance";
+                                throw new Exception($amount_error);
+                            }
                             $trans_type = 'Transfer';
                         } else if ($funct_address==$transfert_CM_functions[0] || $funct_address==$transfert_CM_functions[3]) { // Mutual Credit
                             // dest can accept amount
-                            $check_passed &= $to_Cm_bal + $amount <= $to_Cm_lim_p;
+                            if ($to_Cm_bal + $amount > $to_Cm_lim_p) {
+                                $data["data"] = "ReceiverWouldHitCMLimitMax";
+                                throw new Exception($amount_error);
+                            }
                             // sender has credit 
-                            $check_passed &=$from_Cm_bal-$amount >= $from_Cm_lim_m;
+                            if ($from_Cm_bal - $amount < $from_Cm_lim_m) {
+                                $data["data"] = "SenderWouldHitCMLimitMin";
+                                throw new Exception($amount_error);
+                            }
                             $trans_type = 'TransferCredit';
                         } else {
-                            $check_passed = false;
-                        }
-                        $need_pending = $check_passed;
-                        if (!$check_passed) {
+                            $data["data"] = "UnexpectedTransferAddress";
                             throw new Exception($amount_error);
                         }
+                        $need_pending = true;
                     } else if ($funct_address==$transfert_NA_functions[1] || $funct_address==$transfert_CM_functions[1]) {
                         // Transfert from 
                         $requestor = $sender;
