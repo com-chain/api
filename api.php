@@ -421,9 +421,10 @@ function sendRawTransaction($rawtx,$gethRPC){
                 // get the amount
                 $amount = hexdec(substr($tr_info,-64));
 
-                // get the infos   
-                $from_status = getAccStatus($from_add, $contract);
-                $to_status = getAccStatus($to_add, $contract);
+                // get the infos 
+                $status = getAccountStatus($from_add, $to_add, $contract)  
+                $from_status = $status[$from_add];
+                $to_status = $status[$to_add];
                 
                  
                 $from_Nt_bal = getNTBalance($from_add, $contract);
@@ -488,8 +489,10 @@ function sendRawTransaction($rawtx,$gethRPC){
                 // get the amount
                 $amount = hexdec(substr($tr_info,-64));
                 
-                $from_status = getAccStatus($sender, $contract);
-                $to_status = getAccStatus($dest, $contract); 
+                $status = getAccountStatus($sender, $dest, $contract)  
+                $from_status = $status[$sender];
+                $to_status = $status[$dest];
+                
                 if ($from_status==1 && $to_status==1) {
                     if ($funct_address==$transfert_NA_functions[0] || 
                         $funct_address==$transfert_CM_functions[0] || 
