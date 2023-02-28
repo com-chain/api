@@ -226,17 +226,19 @@ function checkSign($dat, $signature, $caller){
 }
 
 
-function getAccountStatus($add_1, $add_2, $contract) {
+function getAccountStatus($addresses, $contract) {
     $version = getVersion($contract);
     $result= array($add_1=0,$add_2=0);
     if (strlen($version)>0) {
         // New Contract use isActive
-        $result[$add_1] = isActive($add_1, $contract);
-        $result[$add_2] = isActive($add_2, $contract);
+        foreach ( $addresses as $add) {
+            $result[$add] = isActive($add, $contract);
+        }
     } else {
-        // Old contract fold back on getAccStatus
-        $result[$add_1] = getAccStatus($add_1, $contract);
-        $result[$add_2] = getAccStatus($add_2, $contract);
+        // Old contract fallback on getAccStatus
+        foreach ( $addresses as $add) {
+            $result[$add] = getAccStatus($add, $contract);
+        }
     }
     
     return $result;
@@ -254,7 +256,8 @@ function checkLegitimateAdmin($dat, $signature, $caller, $server){
             
             // Get the caller type and status
             $acctype = getAccType($caller, $contract);
-            $accStatus = getAccStatus($caller, $contract);
+            $status =getAccountStatus(array($caller), $contract);
+            $accStatus = $status[$caller];
             
             if ($acctype==2 && $accStatus==1){
                 $result = true;
