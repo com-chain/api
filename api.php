@@ -425,7 +425,7 @@ function sendRawTransaction($rawtx,$gethRPC){
                 $amount = hexdec(substr($tr_info,-64));
 
                 // get the infos 
-                $status = getAccountStatus(array($from_add, $to_add), $contract)  
+                $status = getAccountStatus(array($from_add, $to_add), $contract);  
                 $from_status = $status[$from_add];
                 $to_status = $status[$to_add];
                 
@@ -493,7 +493,7 @@ function sendRawTransaction($rawtx,$gethRPC){
             if (in_my_array($funct_address, $transfert_functs)) {
 
                 
-                $status = getAccountStatus(array($sender, $dest), $contract)  
+                $status = getAccountStatus(array($sender, $dest), $contract);  
                 $from_status = $status[$sender];
                 $to_status = $status[$dest];
                 
@@ -593,14 +593,14 @@ function sendRawTransaction($rawtx,$gethRPC){
                 // We have a pledge:
                 $trans_type = 'Pledge';
                 $from_add = 'Admin';
-                $to_add = $dest;  
+                $to_add = $dest;
                  
-                $acctype = getAccType($sender, $contract);
-                $status = getAccountStatus(array($sender), $contract)[$sender];
-                
-                $need_pending = $acctype==2 && $status==1;
+                $acctype = getAccType($sender, $contract); 
+                $status = getAccountStatus(array($sender), $contract);
+                $curr_stat= $status[$sender];
+
+                $need_pending = $acctype==2 && $curr_stat==1;
             }
-                 
         }
     
           
