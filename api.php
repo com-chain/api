@@ -593,14 +593,15 @@ function sendRawTransaction($rawtx,$gethRPC){
                 // We have a pledge:
                 $trans_type = 'Pledge';
                 $from_add = 'Admin';
-                $to_add = $dest;
+                $to_add = $dest;  
                  
-                $acctype = getAccType($sender, $contract); 
+                $acctype = getAccType($sender, $contract);
                 $status = getAccountStatus(array($sender), $contract);
                 $curr_stat= $status[$sender];
-
+                
                 $need_pending = $acctype==2 && $curr_stat==1;
             }
+                 
         }
     
           
