@@ -82,6 +82,56 @@ function getAccStatus($address, $contract){
 }
 
 
+function isActive($address, $contract){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => '0x9f8a13d7000000000000000000000000'.substr($address,2)
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $fields_string);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'}; 
+    
+    return substr($data,-1);
+}
+ 
+function getVersion( $contract){
+     $url   = getServerAddress()."/api.php";
+     $ch = curl_init();
+     $ethCall = ['to' =>$contract,
+                 'data' => '0x54fd4d50'
+                ];
+     $fields = ['ethCall'=>$ethCall];
+     $fields_string = http_build_query($fields);
+ 
+     curl_setopt($ch, CURLOPT_URL, $url);
+     // Set so curl_exec returns the result instead of outputting it.
+     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+     curl_setopt($ch, CURLOPT_POST, count($fields));
+     curl_setopt($ch, CURLOPT_POSTFIELDS, $fields_string);
+     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+ 
+     // Get the response and close the channel.
+     $response = curl_exec($ch);
+     curl_close($ch);
+ 
+     $json = json_decode($response);
+     $data= $json->{'data'};
+ 
+     return $data; 
 
 function getNumber($address, $contract, $function){
     $url   = getServerAddress()."/api.php";  
@@ -170,6 +220,27 @@ function checkSign($dat, $signature, $caller){
   return $caller==personal_ecRecover($dat, $signature);
 }
 
+function getAccountStatus($addresses, $contract) {
+     $version = getVersion($contract);
+     $result= array();
+     foreach ( $addresses as $add) {
+             $result[$add] = 0;
+     }
+     if (strlen(strval($version))>2) {
+         // New Contract use isActive
+         foreach ( $addresses as $add) {
+             $result[$add] = isActive($add, $contract);
+         }
+     } else {
+         // Old contract fallback on getAccStatus
+         foreach ( $addresses as $add) {
+             $result[$add] = getAccStatus($add, $contract);
+         }
+     }
+ 
+     return $result;
+}
+
 
 function checkLegitimateAdmin($dat, $signature, $caller, $server){
     $result = false;
@@ -182,7 +253,8 @@ function checkLegitimateAdmin($dat, $signature, $caller, $server){
             
             // Get the caller type and status
             $acctype = getAccType($caller, $contract);
-            $accStatus = getAccStatus($caller, $contract);
+            $status =getAccountStatus(array($caller), $contract);
+            $accStatus = $status[$caller];
             
             if ($acctype==2 && $accStatus==1){
                 $result = true;

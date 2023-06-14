@@ -55,6 +55,10 @@ function personal_ecRecoverPublic($msg, $signed) {
     $hex = keccak256WithPrefix($personal_prefix_msg);
     return ecRecoverPublic($hex, $signed);
 }
+
+function keyToAddress($publicKeyString) {
+    return '0x'. substr(keccak256WithPrefix(hex2bin($publicKeyString)), -40);
+}
     
 function ecRecoverPublic($hex, $signed) {
     $rHex   = substr($signed, 2, 64);
@@ -81,7 +85,7 @@ function ecRecoverPublic($hex, $signed) {
     $publicKey = Signature::recoverPublicKey($rGmp, $sGmp, $messageGmp, $recovery);
     $publicKeyString = $publicKey["x"] . $publicKey["y"];
 
-    return array('0x'. substr(keccak256WithPrefix(hex2bin($publicKeyString)), -40),$publicKeyString);
+    return array(keyToAddress($publicKeyString),$publicKeyString);
 }
 
 function strToHex($string)

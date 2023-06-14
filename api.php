@@ -333,11 +333,13 @@ function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $a
     $query = "INSERT INTO testtransactions (".join(', ',array_keys($fields));
     $query = $query.',time) VALUES ('.join(', ',$val).','.time().')';
     
-    $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_rw", "Private_access_transactions")->build();
     $keyspace  = 'comchain';
-    $session1  = $cluster->connect($keyspace);
-
-    $session1->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
+    // for pledge only the other direction is inserted
+    if ($trans_type!='Pledge') {
+        $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_rw", "Private_access_transactions")->build();
+        $session1  = $cluster->connect($keyspace);
+        $session1->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
+    }
  
     $cluster2  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_rw", "Private_access_transactions")->build();
     $session2  = $cluster2->connect($keyspace);
@@ -378,6 +380,7 @@ function sendRawTransaction($rawtx,$gethRPC){
                             //   Direct      From    On Behalf   Accept Request
     $transfert_NA_functions = ['a5f7c148','58258353','1b6b1ee5','132019f4'];
     $transfert_CM_functions = ['60ca9c4c','2ef9ade2','74c421fe','1415707c'];
+    $pledge_function = '6c343eef';
     $transfert_functs =  array_merge($transfert_NA_functions,$transfert_CM_functions);
     
     $lock_error = 'Account_Locked_Error';
@@ -421,9 +424,10 @@ function sendRawTransaction($rawtx,$gethRPC){
                 // get the amount
                 $amount = hexdec(substr($tr_info,-64));
 
-                // get the infos   
-                $from_status = getAccStatus($from_add, $contract);
-                $to_status = getAccStatus($to_add, $contract);
+                // get the infos 
+                $status = getAccountStatus(array($from_add, $to_add), $contract);  
+                $from_status = $status[$from_add];
+                $to_status = $status[$to_add];
                 
                  
                 $from_Nt_bal = getNTBalance($from_add, $contract);
@@ -481,15 +485,18 @@ function sendRawTransaction($rawtx,$gethRPC){
             $contract = getContract1(substr($tr_info,0,40));
             $contract2 = '0x'.substr($tr_info,0,40);
             
+            // get the dest
+            $dest = '0x'.substr($tr_info,78,40);
+            // get the amount
+            $amount = hexdec(substr($tr_info,-64));
             
             if (in_my_array($funct_address, $transfert_functs)) {
-                 // get the dest
-                $dest = '0x'.substr($tr_info,78,40);
-                // get the amount
-                $amount = hexdec(substr($tr_info,-64));
+
                 
-                $from_status = getAccStatus($sender, $contract);
-                $to_status = getAccStatus($dest, $contract); 
+                $status = getAccountStatus(array($sender, $dest), $contract);  
+                $from_status = $status[$sender];
+                $to_status = $status[$dest];
+                
                 if ($from_status==1 && $to_status==1) {
                     if ($funct_address==$transfert_NA_functions[0] || 
                         $funct_address==$transfert_CM_functions[0] || 
@@ -582,8 +589,18 @@ function sendRawTransaction($rawtx,$gethRPC){
                     throw new Exception($lock_error);
                 }
             
-            }
+            } else if ($pledge_function == $funct_address) {
+                // We have a pledge:
+                $trans_type = 'Pledge';
+                $from_add = 'Admin';
+                $to_add = $dest;
                  
+                $acctype = getAccType($sender, $contract); 
+                $status = getAccountStatus(array($sender), $contract);
+                $curr_stat= $status[$sender];
+
+                $need_pending = $acctype==2 && $curr_stat==1;
+            }
         }
     
           
@@ -607,9 +624,11 @@ function sendRawTransaction($rawtx,$gethRPC){
                 $wh_status = 2;
             }
         }
-        storeAdditionalData(strlen($shop_url)>0, $data['data'], $wh_status);
+        // Storing the memos, shop and/or delegate
+        storeAdditionalData(strlen($shop_url)>0, $data['data'], $wh_status); 
         
         if ($need_pending) {
+            // adding pending transaction
             storeTransaction(strlen($shop_url)>0, $data['data'], $wh_status, $amount, $from_add, $to_add, $trans_type); 
         }
        
