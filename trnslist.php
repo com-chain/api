@@ -89,6 +89,11 @@ foreach ($full_set_row as $row) {
     }
     
     $row['time'] = $row['time']->value();
+    if(!is_null($row['receivedat'])) {
+        $row['receivedat'] = $row['receivedat']->value();
+    } else {
+        $row['receivedat'] =  $row['time'];    // for old transaction without receivedAt
+    }
     
 
     $jstring[$line_ct] = json_encode($row);
