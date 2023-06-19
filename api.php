@@ -243,7 +243,7 @@ function storeAdditionalData($is_valid_shop, $transaction_ash, $web_hook_status)
     if (isset($memo_to) && $memo_to!="") {
         $fields['message_to'] = $memo_to;
         $val[]='?';    
-    } 
+    }
     
     // Add if not only the status
     if (sizeof($fields)>1) {
@@ -251,8 +251,7 @@ function storeAdditionalData($is_valid_shop, $transaction_ash, $web_hook_status)
         $val[]='?';    
         // build the query
         $query = "INSERT INTO webshop_transactions (".join(', ',array_keys($fields));
-        $query = $query.',recievedAt) VALUES ('.join(', ',$val).",'".time()."')";
-
+        $query = $query.',receivedAt) VALUES ('.join(', ',$val).",".time().")";
         
         $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("webhook_rw", "Private_access_transactions")->build();
         $keyspace  = 'comchain';
