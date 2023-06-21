@@ -245,19 +245,17 @@ function storeAdditionalData($is_valid_shop, $transaction_ash, $web_hook_status)
         $val[]='?';    
     }
     
-    // Add if not only the status
-    if (sizeof($fields)>1) {
-        $fields['hash'] = $transaction_ash;
-        $val[]='?';    
-        // build the query
-        $query = "INSERT INTO webshop_transactions (".join(', ',array_keys($fields));
-        $query = $query.',receivedAt) VALUES ('.join(', ',$val).",".time().")";
-        
-        $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("webhook_rw", "Private_access_transactions")->build();
-        $keyspace  = 'comchain';
-        $session  = $cluster->connect($keyspace);
-        $session->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
-    }
+    $fields['hash'] = $transaction_ash;
+    $val[]='?';    
+    // build the query
+    $query = "INSERT INTO webshop_transactions (".join(', ',array_keys($fields));
+    $query = $query.',receivedAt) VALUES ('.join(', ',$val).",".time().")";
+    
+    $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("webhook_rw", "Private_access_transactions")->build();
+    $keyspace  = 'comchain';
+    $session  = $cluster->connect($keyspace);
+    $session->execute(new Cassandra\SimpleStatement($query), array('arguments' => $fields));
+    
 }
 
 function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $amount, $from, $to ,$trans_type) {
