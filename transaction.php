@@ -10,13 +10,14 @@ include './checkAdmin.php';
  $_PUT['req'] => {"data":{
                             "caller" : "<caller 0x....>",   <= mandatory
                             "addr" :   "<caller 0x....>",   <= mandatory
-                            "count" : 500 ,                 <= optional
+                            "count" : 1000 ,                <= optional
                             "offset" : 0 ,                  <= optional
                             "start" : 0 ,                   <= optional
                             "end" : 1660338149 ,            <= optional
                             "add_pending" : 1 ,             <= optional
                             "part_add" : "<part 0x....>" ,  <= optional
-                            "admin" : "<currencyname>" ,    <= optional    
+                            "currency" : "<currencyname>" , <= mandatory if caller != address    
+                            },
                   "sign"="<signature>"}
 
 */
@@ -24,13 +25,13 @@ include './checkAdmin.php';
 /* Check payload format */
 $payload = json_decode($_PUT['req']);
 if (!array_key_exists('data', $payload) || !array_key_exists('sign', $payload)) {
-    echo "Wrong payload format!";
+    echo json_encode({"error":True, "msg":"Wrong payload format!"});
     exit();
 }
 
 /* Check data format */
-if (!array_key_exists('caller', $payload['data']) || !array_key_exists('caller', $payload['addr']) ) {
-    echo "Wrong data format!";
+if (!array_key_exists('caller', $payload['data']) || !array_key_exists('addr', $payload['data']) ) {
+    echo json_encode({"error":True, "msg":"Wrong data format!"});
     exit();
 }
 
@@ -38,33 +39,38 @@ if (!array_key_exists('caller', $payload['data']) || !array_key_exists('caller',
 if (strlen($payload['data']['caller']) == 42) {
 	$caller = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $payload['data']['caller']));
 } else {
-	echo "Wrong caller format!";
+	echo json_encode({"error":True, "msg":"Wrong caller format!"});
 	exit();
 }
 
 if (strlen($payload['data']['addr']) == 42) {
 	$addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $payload['data']['addr']));
 } else {
-	echo "Wrong address format!";
+	echo json_encode({"error":True, "msg":"Wrong address format!"});
 	exit();
 }
 
 
-/* Case Admin */
-if (array_key_exists('admin', $payload['data'])){
-    if (!checkLegitimateAdmin($payload['data'], $payload['sign'], $caller, $payload['data']['admin'])) {
-        echo "Not valid Admin!";
-	    exit();
-    }  
+/* Case Admin (if addr!=caller it must be admin)*/
+if ($caller!=$addr){
+    if (array_key_exists('currency', $payload['data'])){
+        if (!checkLegitimateAdmin($payload['data'], $payload['sign'], $caller, $payload['data']['currency'])) {
+            echo json_encode({"error":True, "msg":"Not valid Admin!"});
+	        exit();
+        }  
+    } else {
+          echo json_encode({"error":True, "msg":"missing currency"});
+	      exit();
+    }    
 } else {
-    if ($caller!=$addr || !checkSign($payload['data'], $payload['sign'], $caller)) {
-     	echo "Bad signature or no right!";
+    if ( !checkSign($payload['data'], $payload['sign'], $caller)) {
+     	echo json_encode({"error":True, "msg":"Bad signature or no right!"});
 	    exit();
     }
 }
 
 
-$limit = 500;
+$limit = 1000;
 if (!empty($payload['data']['count']) && is_numeric($payload['data']['count'])){
 	$limit = $payload['data']['count'];
 }
@@ -101,9 +107,6 @@ $keyspace  = 'comchain';
 $session  = $cluster->connect($keyspace);
 
 $counter = $offset + $limit;
-if ($part_add!=''){  
-    $counter = $offset + 500;
-}
 
 
 // commited trans
@@ -187,6 +190,8 @@ foreach ($full_set_row as $row) {
     $jstring[$line_ct] = json_encode($row);
     $line_ct++;
 }
+
+/* TO DO: filter list over the currency once added into the DB */
 
 if (sizeof($jstring)<$offset) {
     echo '[]';
