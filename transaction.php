@@ -10,8 +10,6 @@ include './checkAdmin.php';
  $_PUT['req'] => {"data":{
                             "caller" : "<caller 0x....>",   <= mandatory
                             "addr" :   "<caller 0x....>",   <= mandatory
-                            "count" : 1000 ,                <= optional
-                            "offset" : 0 ,                  <= optional
                             "start" : 0 ,                   <= optional
                             "end" : 1660338149 ,            <= optional
                             "add_pending" : 1 ,             <= optional
@@ -69,17 +67,6 @@ if ($caller!=$addr){
     }
 }
 
-
-$limit = 1000;
-if (!empty($payload['data']['count']) && is_numeric($payload['data']['count'])){
-	$limit = $payload['data']['count'];
-}
-
-$offset = 0;
-if (!empty($payload['data']['offset']) && is_numeric($payload['data']['offset'])){
-	$offset = $payload['data']['offset'];
-} 
-
 $start = 0;
 if (!empty($payload['data']['start']) && is_numeric($payload['data']['start'])){
 	$start = $payload['data']['start'];
@@ -100,17 +87,22 @@ if (!empty($payload['data']['add_p']) && $payload['data']['add_p'] == 0) {
     $add_pending = false;
 }
 
+$currency ='';
+if (array_key_exists('currency', $payload['data'])  && !empty($payload['data']['currency']) ) {
+    $currency = $payload['data']['currency'];
+}
+
+
  
 $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")
                 ->build();
 $keyspace  = 'comchain';
 $session  = $cluster->connect($keyspace);
 
-$counter = $offset + $limit;
 
 
 // commited trans
-$query = "select * from testtransactions WHERE add1 = ? AND status = 0 AND time >= $start AND time <= $end ORDER BY time DESC limit $counter;";
+$query = "select * from testtransactions WHERE add1 = ? AND status = 0 AND time >= $start AND time <= $end ORDER BY time DESC;";
 $options = array('arguments' => array($addr));
 $full_set_row_com = $session->execute(new Cassandra\SimpleStatement($query), $options);
 
@@ -122,7 +114,7 @@ foreach ($full_set_row_com as $row) {
 // Pending trans
 $full_set_row_pending  = [];
 if ($add_pending) {
-    $query = "select * from testtransactions WHERE add1 = ? AND status = 1 and  AND time >= $start AND time <= $end  ORDER BY time DESC limit $counter;";
+    $query = "select * from testtransactions WHERE add1 = ? AND status = 1 and  AND time >= $start AND time <= $end  ORDER BY time DESC;";
 
     $options = array('arguments' => array($addr));
     $full_set_row_pending = $session->execute(new Cassandra\SimpleStatement($query), $options);
@@ -147,6 +139,17 @@ if ($part_add!='') {
     $new_row_set = [];
     foreach ($full_set_row as $row_match){ 
         if ($row_match['add2']==$part_add){
+            array_push($new_row_set, $row_match);
+        }
+    }
+    $full_set_row = $new_row_set;
+}
+
+// filter over  the currency 
+if ($currency!=''){
+    $new_row_set = [];
+    foreach ($full_set_row as $row_match){ 
+        if (!array_key_exists('currency',$row_match) || $row_match['currency']=='' || $row_match['currency']==$currency){
             array_push($new_row_set, $row_match);
         }
     }
@@ -191,15 +194,9 @@ foreach ($full_set_row as $row) {
     $line_ct++;
 }
 
-/* TO DO: filter list over the currency once added into the DB */
 
-if (sizeof($jstring)<$offset) {
-    echo '[]';
-} else {
-    $jstring = array_slice($jstring, $offset);
-    if (sizeof($jstring)>$limit){
-       $jstring = array_slice($jstring, 0, $limit); 
-    }
+    
+  
 
     echo json_encode($jstring);  
 }
