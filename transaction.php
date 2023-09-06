@@ -21,15 +21,19 @@ include './checkAdmin.php';
 */
 
 /* Check payload format */
-$payload = json_decode($_PUT['req']);
+if (!array_key_exists('req', $_REQUEST)) {
+   echo json_encode(array("error"=>True, "msg"=>"Missing payload!"));
+   exit();
+}
+$payload = json_decode($_REQUEST['req']);
 if (!array_key_exists('data', $payload) || !array_key_exists('sign', $payload)) {
-    echo json_encode({"error":True, "msg":"Wrong payload format!"});
+    echo json_encode(array("error"=>True, "msg"=>"Wrong payload format!"));
     exit();
 }
 
 /* Check data format */
 if (!array_key_exists('caller', $payload['data']) || !array_key_exists('addr', $payload['data']) ) {
-    echo json_encode({"error":True, "msg":"Wrong data format!"});
+    echo json_encode(array("error"=>True, "msg"=>"Wrong data format!"));
     exit();
 }
 
@@ -37,14 +41,14 @@ if (!array_key_exists('caller', $payload['data']) || !array_key_exists('addr', $
 if (strlen($payload['data']['caller']) == 42) {
 	$caller = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $payload['data']['caller']));
 } else {
-	echo json_encode({"error":True, "msg":"Wrong caller format!"});
+    echo json_encode(array("error"=>True, "msg"=>"Wrong caller format!"));
 	exit();
 }
 
 if (strlen($payload['data']['addr']) == 42) {
 	$addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $payload['data']['addr']));
 } else {
-	echo json_encode({"error":True, "msg":"Wrong address format!"});
+    echo json_encode(array("error"=>True, "msg"=>"Wrong address format!"));
 	exit();
 }
 
@@ -53,16 +57,16 @@ if (strlen($payload['data']['addr']) == 42) {
 if ($caller!=$addr){
     if (array_key_exists('currency', $payload['data'])){
         if (!checkLegitimateAdmin($payload['data'], $payload['sign'], $caller, $payload['data']['currency'])) {
-            echo json_encode({"error":True, "msg":"Not valid Admin!"});
+            echo json_encode(array("error"=>True, "msg"=>"Not valid Admin!"));
 	        exit();
         }  
     } else {
-          echo json_encode({"error":True, "msg":"missing currency"});
+    echo json_encode(array("error"=>True, "msg"=>"missing currency"));
 	      exit();
     }    
 } else {
     if ( !checkSign($payload['data'], $payload['sign'], $caller)) {
-     	echo json_encode({"error":True, "msg":"Bad signature or no right!"});
+    echo json_encode(array("error"=>True, "msg"=>"Bad signature or no right!"));
 	    exit();
     }
 }
@@ -199,6 +203,6 @@ foreach ($full_set_row as $row) {
   
 
     echo json_encode($jstring);  
-}
+
 
 ?>
