@@ -258,7 +258,7 @@ function storeAdditionalData($is_valid_shop, $transaction_ash, $web_hook_status)
     
 }
 
-function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $amount, $from, $to ,$trans_type) {
+function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $amount, $from, $to, $trans_type, $currency) {
     $shop_id=$_REQUEST['shopId'];
     $shop_ref=$_REQUEST['txId'];
     $delegate=$_REQUEST['delegate'];
@@ -323,6 +323,12 @@ function storeTransaction($is_valid_shop, $transaction_ash, $web_hook_status, $a
         $val[]='?';   
     }
     
+    if (isset($currency) && $currency!="") {
+        $fields['currency'] = $currency;
+        $val[]='?';   
+    }  
+    
+    
     /* incompatibiliy between the number of bytes=> set in the text
     $fields['time'] = ''.time();
     $val[]='?';
@@ -384,6 +390,7 @@ function sendRawTransaction($rawtx,$gethRPC){
     
     $lock_error = 'Account_Locked_Error';
     $amount_error = 'Incompatible_Amount';
+    $currency = '';
    
     try {
     
@@ -412,6 +419,7 @@ function sendRawTransaction($rawtx,$gethRPC){
             // get the contract for the balances
             $contract = getContract1(substr($tr_info,0,40));
             $contract2 = '0x'.substr($tr_info,0,40);
+            $currency = getCurrency($contract);
             
              if ($funct_address==$transfert_NA_functions[2] || $funct_address==$transfert_CM_functions[2]) {
                 // Transfert On Behalf 
@@ -483,6 +491,7 @@ function sendRawTransaction($rawtx,$gethRPC){
             // get the contract for the balances
             $contract = getContract1(substr($tr_info,0,40));
             $contract2 = '0x'.substr($tr_info,0,40);
+            $currency = getCurrency($contract);
             
             // get the dest
             $dest = '0x'.substr($tr_info,78,40);
@@ -629,7 +638,7 @@ function sendRawTransaction($rawtx,$gethRPC){
         
         if ($need_pending) {
             // adding pending transaction
-            storeTransaction(strlen($shop_url)>0, $data['data'], $wh_status, $amount, $from_add, $to_add, $trans_type); 
+            storeTransaction(strlen($shop_url)>0, $data['data'], $wh_status, $amount, $from_add, $to_add, $trans_type, $currency); 
         }
        
     } catch (exception $e) {

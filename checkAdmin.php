@@ -30,6 +30,25 @@ function getServerConfig($server){
     return $json->{'server'};  
 }
 
+function getCurrency($contract){
+    $url   = getServerAddress()."/ipns/Qmcir6CzDtTZvywPt9N4uXbEjp3CJeVpW6CetMG6f93QNt/configs/list.json";  
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    $json = json_decode($response);
+    if (array_key_exists($contract, $json)) {
+    	return $json->{'server'};  
+    } else {
+    	return '';
+    }
+}
+
+
 function getAccType($address, $contract){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
