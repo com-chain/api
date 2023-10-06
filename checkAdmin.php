@@ -40,9 +40,9 @@ function getCurrency($contract){
     // Get the response and close the channel.
     $response = curl_exec($ch);
     curl_close($ch);
-    $json = json_decode($response);
+    $json = json_decode($response,true);
     if (array_key_exists($contract, $json)) {
-    	return $json->{'server'};  
+    	return $json[$contract];  
     } else {
     	return '';
     }

@@ -420,8 +420,7 @@ function sendRawTransaction($rawtx,$gethRPC){
             $contract = getContract1(substr($tr_info,0,40));
             $contract2 = '0x'.substr($tr_info,0,40);
             $currency = getCurrency($contract);
-            
-             if ($funct_address==$transfert_NA_functions[2] || $funct_address==$transfert_CM_functions[2]) {
+            if ($funct_address==$transfert_NA_functions[2] || $funct_address==$transfert_CM_functions[2]) {
                 // Transfert On Behalf 
             
                 // get the account debited
@@ -492,7 +491,6 @@ function sendRawTransaction($rawtx,$gethRPC){
             $contract = getContract1(substr($tr_info,0,40));
             $contract2 = '0x'.substr($tr_info,0,40);
             $currency = getCurrency($contract);
-            
             // get the dest
             $dest = '0x'.substr($tr_info,78,40);
             // get the amount
@@ -646,7 +644,7 @@ function sendRawTransaction($rawtx,$gethRPC){
         $data['msg'] = $e->getMessage();
     }
     
-    //$data['dbg']= $dbg;
+    /* $data['dbg']= $dbg; */
     return json_encode($data);
     
 }
