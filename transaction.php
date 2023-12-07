@@ -13,11 +13,12 @@ include './checkAdmin.php';
                             "start" : 0 ,                   <= optional
                             "end" : 1660338149 ,            <= optional
                             "add_pending" : 1 ,             <= optional
+                            "only_failed" : 0 ,             <= optional
                             "part_add" : "<part 0x....>" ,  <= optional
                             "currency" : "<currencyname>" , <= mandatory if caller != address    
                             },
                   "sign"="<signature>"}
-
+                  
 */
 
 /* Check payload format */
@@ -25,6 +26,7 @@ if (!array_key_exists('req', $_REQUEST)) {
    echo json_encode(array("error"=>True, "msg"=>"Missing payload!"));
    exit();
 }
+
 $payload = json_decode($_REQUEST['req']);
 if (!array_key_exists('data', $payload) || !array_key_exists('sign', $payload)) {
     echo json_encode(array("error"=>True, "msg"=>"Wrong payload format!"));
@@ -52,7 +54,6 @@ if (strlen($payload['data']['addr']) == 42) {
 	exit();
 }
 
-
 /* Case Admin (if addr!=caller it must be admin)*/
 if ($caller!=$addr){
     if (array_key_exists('currency', $payload['data'])){
@@ -68,6 +69,18 @@ if ($caller!=$addr){
     if ( !checkSign($payload['data'], $payload['sign'], $caller)) {
     echo json_encode(array("error"=>True, "msg"=>"Bad signature or no right!"));
 	    exit();
+    }
+}
+
+
+
+require_once 'libs/jsonRPCClient.php';
+
+function getRPCResponse($result){
+    if(isset($result['result'])){
+        return $result['result'];
+    } else {
+        throw new Exception($result['error']['message']);
     }
 }
 
@@ -87,7 +100,13 @@ if (!empty($payload['data']['partnair_addr']) && strlen($payload['data']['partna
 }
 
 $add_pending = true;
-if (!empty($payload['data']['add_p']) && $payload['data']['add_p'] == 0) {
+if (!empty($payload['data']['add_pending']) && $payload['data']['add_pending'] == 0) {
+    $add_pending = false;
+}
+
+$only_failed = false;
+if (!empty($payload['data']['only_failed']) && $payload['data']['only_failed'] == 1) {
+    $only_failed = true;
     $add_pending = false;
 }
 
@@ -111,32 +130,35 @@ $options = array('arguments' => array($addr));
 $full_set_row_com = $session->execute(new Cassandra\SimpleStatement($query), $options);
 
 $full_set_row = [];
+$commited_hash = [];
 foreach ($full_set_row_com as $row) {
-    array_push($full_set_row, $row);
+    if (!only_failed) {
+        array_push($full_set_row, $row);
+    }
+    array_push($commited_hash, $row['hash']);
 }
 
 // Pending trans
 $full_set_row_pending  = [];
-if ($add_pending) {
-    $query = "select * from testtransactions WHERE add1 = ? AND status = 1 and  AND time >= $start AND time <= $end  ORDER BY time DESC;";
+$query = "select * from testtransactions WHERE add1 = ? AND status = 1 and  AND time >= $start AND time <= $end  ORDER BY time DESC;";
 
-    $options = array('arguments' => array($addr));
-    $full_set_row_pending = $session->execute(new Cassandra\SimpleStatement($query), $options);
+$options = array('arguments' => array($addr));
+$full_set_row_pending = $session->execute(new Cassandra\SimpleStatement($query), $options);
 
-    foreach ($full_set_row_pending as $row) {
-        $hash = $row['hash'];
-        $duplicate = false;
-        foreach ($full_set_row as $row_match){
-            if ($row_match['status']==0 && $row_match['hash']==$hash){
-                $duplicate = true;
-                continue;
-            }
-        }
-        if (!$duplicate) {
-            array_unshift($full_set_row, $row);
-        } 
-    }
+foreach ($full_set_row_pending as $row) {
+	$hash = $row['hash'];
+	if ( !in_array($hash,  $commited_hash)) {
+	    $ret = getRPCResponse($gethRPC->eth_getTransactionByHash($hash),"pending");
+	    $row['transaction']=$ret;
+	    if ($row['transaction']['blockNumber']!='0x0'){
+		$row['status']=2;
+	    }
+	    if ($add_pending || $row['status']==2) {
+	        array_push($full_set_row, $row);
+	    }
+	}
 }
+
 
 // remouve unvanted address in case of filter on the other address
 if ($part_add!='') {
@@ -160,6 +182,7 @@ if ($currency!=''){
     $full_set_row = $new_row_set;
 }
 
+// order by time
 usort($full_set_row, function($a, $b) { 
         $va=$a['time']->value(); 
         $vb=$b['time']->value();
