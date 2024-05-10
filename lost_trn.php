@@ -12,7 +12,7 @@ function getRPCResponse($result){
     if(isset($result['result'])){
         return $result['result'];
     } else {
-        throw new Exception($result['error']['message']);
+        return  array ("blockNumber"=>'0x0', 'error'=>'GETH return no result for this trn hase');
     }
 }
 

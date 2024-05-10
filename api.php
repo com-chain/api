@@ -605,7 +605,7 @@ function sendRawTransaction($rawtx,$gethRPC){
                 $status = getAccountStatus(array($sender), $contract);
                 $curr_stat= $status[$sender];
                 
-                $need_pending = $acctype==2 && $curr_stat==1;
+                $need_pending = ($acctype==2 || $acctype==3) && $curr_stat==1;
             }
                  
         }
