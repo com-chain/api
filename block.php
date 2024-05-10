@@ -39,7 +39,7 @@ function blockNumber($gethRPC){
     $data = getDefaultResponse();
     try {
         $ret = getRPCResponse($gethRPC->eth_blockNumber());
-        $data['data'] = hexdec($ret);
+        $data['data'] = array("blockNumber"=>hexdec($ret));
     }
     catch (exception $e) {
         $data['error'] = true;
@@ -53,7 +53,7 @@ function blockByNumber($gethRPC,$blcnb){
     $data = getDefaultResponse();
     try {
         $ret = getRPCResponse($gethRPC->eth_getBlockByNumber($blcnb,true));
-        $data["infos"]=$ret;
+        $data["data"]=$ret;
     }
     catch (exception $e) {
         $data['error'] = true;
