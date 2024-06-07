@@ -8,7 +8,7 @@ $gethRPC = new jsonRPCClient('http://127.0.0.1:8545');
 
 if(isset($_REQUEST['hash'])){
     header('Content-Type: application/json');
-    echo getTransaction($_REQUEST['hash'],$gethRPC);
+    echo blockByHash($_REQUEST['hash'],$gethRPC);
 } else if(isset($_REQUEST['block']) && isset($_REQUEST['index'])){
     header('Content-Type: application/json');
     echo getTransactionInBlock($_REQUEST['block'],$_REQUEST['index'],$gethRPC);
@@ -62,35 +62,11 @@ function blockByNumber($gethRPC,$blcnb){
     return json_encode($data);
 }
 
-
-function getTransaction($hash, $gethRPC){
+function blockByHash($gethRPC,$blchash){
     $data = getDefaultResponse();
     try {
-        $ret = getRPCResponse($gethRPC->eth_getTransactionByHash($hash),
-        "pending");
-        $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")
-                ->build();
-        $keyspace  = 'comchain';
-        $session  = $cluster->connect($keyspace);
-        $query = "SELECT * FROM testtransactions WHERE hash = ?"; 
-        $options = array('arguments' => array($hash));
-
-	    foreach ($session->execute(new Cassandra\SimpleStatement($query), $options) as $row) {
-	        if ($row['direction']==1){
-	            if ( $row['status']==0 || !isset($arr)) {
-	                $arr = $row;
-	                $arr['addr_from'] = $arr['add1'];
-                    $arr['addr_to'] = $arr['add2'];
-                    $arr['time'] = $arr['time']->value();
-                }
-	        }
-	        
-	    }
-	    
-	    
-        $arr['transaction'] = $ret;
-        $ret = json_encode($arr);
-        $data = $ret;
+        $ret = getRPCResponse($gethRPC->eth_getBlockByHash($blcnb,true));
+        $data["data"]=$ret;
     }
     catch (exception $e) {
         $data['error'] = true;
@@ -98,6 +74,8 @@ function getTransaction($hash, $gethRPC){
     }
     return json_encode($data);
 }
+
+
 
 function getTransactionInBlock($block,$index,$gethRPC) {
     $data = getDefaultResponse();
