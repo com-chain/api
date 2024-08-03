@@ -49,7 +49,6 @@ function getTransactionReceipt($hash, $gethRPC){
 	    }
 	    
         $arr['receipt'] = $ret;
-        $ret = json_encode($arr);
         $data = $ret;
     }
     catch (exception $e) {
