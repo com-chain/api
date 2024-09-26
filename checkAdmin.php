@@ -267,6 +267,38 @@ function getAccountStatus($addresses, $contract) {
     return $result;
 }
 
+function getPreventTransactionRule($sender_type, $reciever_type, $contract){
+    $url   = getServerAddress()."/api.php";  
+    $ch = curl_init();
+    $ethCall = ['to' =>$contract, 
+                'data' => '0xe399cca7'.substr('0000000000000000000000000000000000000000000000000000000000000000' . $sender_type, -64).substr('0000000000000000000000000000000000000000000000000000000000000000' . $reciever_type, -64).
+               ];
+    $fields = ['ethCall'=>$ethCall];
+    $fields_string = http_build_query($fields);
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    // Set so curl_exec returns the result instead of outputting it.
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, count($fields));
+    curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+    // Get the response and close the channel.
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($response);
+    $data= $json->{'data'}; 
+    
+    return  hexdec($data);
+}
+
+function checkPreventTransactionRule($sender_address, $reciever_address, $contract) {
+    $sender_type = getAccType($sender_address, $contract);
+    $reciever_type = getAccType($reciever_address, $contract);
+    $ptr = getPreventTransactionRule($sender_type, $reciever_type, $contract);
+    return 1 != $ptr; 
+}
 
 function checkLegitimateAdmin($dat, $signature, $caller, $server){
     $result = false;

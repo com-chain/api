@@ -390,6 +390,7 @@ function sendRawTransaction($rawtx,$gethRPC){
     
     $lock_error = 'Account_Locked_Error';
     $amount_error = 'Incompatible_Amount';
+    $restricted_transaction_type_error = 'Incompatible_Account_Types_Error';
     $currency = '';
    
     try {
@@ -429,7 +430,12 @@ function sendRawTransaction($rawtx,$gethRPC){
                 $to_add = '0x'.substr($tr_info,142,40);
                 // get the amount
                 $amount = hexdec(substr($tr_info,-64));
-
+                
+                if (!checkPreventTransactionRule($from_add, $to_add, $contract)) {
+                     $data["data"] = "TransactionBetweenForbidenAccountTypes";
+                     throw new Exception($restricted_transaction_type_error);
+                }
+                
                 // get the infos 
                 $status = getAccountStatus(array($from_add, $to_add), $contract);  
                 $from_status = $status[$from_add];
@@ -509,9 +515,16 @@ function sendRawTransaction($rawtx,$gethRPC){
                         $funct_address==$transfert_NA_functions[3] || 
                         $funct_address==$transfert_CM_functions[3]) {
                         // Direct Transfert and Accept reqest
+                        
+                      
 
                         $from_add = $sender;
-                        $to_add = $dest;                       
+                        $to_add = $dest;  
+                        
+                        if (!checkPreventTransactionRule($from_add, $to_add, $contract)) {
+                             $data["data"] = "TransactionBetweenForbidenAccountTypes";
+                             throw new Exception($restricted_transaction_type_error);
+                        }                     
                         
                         // get the infos 
                         
@@ -563,6 +576,11 @@ function sendRawTransaction($rawtx,$gethRPC){
                         
                         $from_add = $dest;
                         $to_add = $sender; 
+                        
+                        if (!checkPreventTransactionRule($from_add, $to_add, $contract)) {
+                             $data["data"] = "TransactionBetweenForbidenAccountTypes";
+                             throw new Exception($restricted_transaction_type_error);
+                        } 
                         
                         $from_Nt_bal = getNTBalance($requested, $contract);
                         $from_Cm_bal = getCMBalance($requested, $contract);
