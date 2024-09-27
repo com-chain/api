@@ -271,7 +271,7 @@ function getPreventTransactionRule($sender_type, $receiver_type, $contract){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
     $ethCall = ['to' =>$contract, 
-                'data' => '0xe399cca7'.substr('0000000000000000000000000000000000000000000000000000000000000000' . $sender_type, -64).substr('0000000000000000000000000000000000000000000000000000000000000000' . $receiver_type, -64)
+                'data' => '0x9582272c'.substr('0000000000000000000000000000000000000000000000000000000000000000' . $sender_type, -64).substr('0000000000000000000000000000000000000000000000000000000000000000' . $receiver_type, -64)
                ];
     $fields = ['ethCall'=>$ethCall];
     $fields_string = http_build_query($fields);
@@ -297,7 +297,7 @@ function checkPreventTransactionRule($sender_address, $receiver_address, $contra
     $sender_type = getAccType($sender_address, $contract);
     $receiver_type = getAccType($receiver_address, $contract);
     $ptr = getPreventTransactionRule($sender_type, $receiver_type, $contract);
-    return 1 != $ptr; 
+    return $ptr != 1; 
 }
 
 function checkLegitimateAdmin($dat, $signature, $caller, $server){

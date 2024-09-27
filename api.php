@@ -520,12 +520,16 @@ function sendRawTransaction($rawtx,$gethRPC){
 
                         $from_add = $sender;
                         $to_add = $dest;  
-                        
+
+
+
+
                         if (!checkPreventTransactionRule($from_add, $to_add, $contract)) {
                              $data["data"] = "TransactionBetweenForbidenAccountTypes";
                              throw new Exception($restricted_transaction_type_error);
                         }                     
-                        
+
+
                         // get the infos 
                         
                         $from_Nt_bal = getNTBalance($sender, $contract);
@@ -581,7 +585,8 @@ function sendRawTransaction($rawtx,$gethRPC){
                              $data["data"] = "TransactionBetweenForbidenAccountTypes";
                              throw new Exception($restricted_transaction_type_error);
                         } 
-                        
+
+
                         $from_Nt_bal = getNTBalance($requested, $contract);
                         $from_Cm_bal = getCMBalance($requested, $contract);
                         $from_Cm_lim_m = getCMLimitM($requested, $contract);
