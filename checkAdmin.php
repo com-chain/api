@@ -271,7 +271,7 @@ function getPreventTransactionRule($sender_type, $receiver_type, $contract){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
     $ethCall = ['to' =>$contract, 
-                'data' => '0xe399cca7'.substr('0000000000000000000000000000000000000000000000000000000000000000' . $sender_type, -64).substr('0000000000000000000000000000000000000000000000000000000000000000' . $receiver_type, -64).
+                'data' => '0xe399cca7'.substr('0000000000000000000000000000000000000000000000000000000000000000' . $sender_type, -64).substr('0000000000000000000000000000000000000000000000000000000000000000' . $receiver_type, -64)
                ];
     $fields = ['ethCall'=>$ethCall];
     $fields_string = http_build_query($fields);
