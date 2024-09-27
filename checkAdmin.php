@@ -267,11 +267,11 @@ function getAccountStatus($addresses, $contract) {
     return $result;
 }
 
-function getPreventTransactionRule($sender_type, $reciever_type, $contract){
+function getPreventTransactionRule($sender_type, $receiver_type, $contract){
     $url   = getServerAddress()."/api.php";  
     $ch = curl_init();
     $ethCall = ['to' =>$contract, 
-                'data' => '0xe399cca7'.substr('0000000000000000000000000000000000000000000000000000000000000000' . $sender_type, -64).substr('0000000000000000000000000000000000000000000000000000000000000000' . $reciever_type, -64).
+                'data' => '0xe399cca7'.substr('0000000000000000000000000000000000000000000000000000000000000000' . $sender_type, -64).substr('0000000000000000000000000000000000000000000000000000000000000000' . $receiver_type, -64).
                ];
     $fields = ['ethCall'=>$ethCall];
     $fields_string = http_build_query($fields);
@@ -293,10 +293,10 @@ function getPreventTransactionRule($sender_type, $reciever_type, $contract){
     return  hexdec($data);
 }
 
-function checkPreventTransactionRule($sender_address, $reciever_address, $contract) {
+function checkPreventTransactionRule($sender_address, $receiver_address, $contract) {
     $sender_type = getAccType($sender_address, $contract);
-    $reciever_type = getAccType($reciever_address, $contract);
-    $ptr = getPreventTransactionRule($sender_type, $reciever_type, $contract);
+    $receiver_type = getAccType($receiver_address, $contract);
+    $ptr = getPreventTransactionRule($sender_type, $receiver_type, $contract);
     return 1 != $ptr; 
 }
 
