@@ -69,7 +69,7 @@ usort($full_set_row, function($a, $b) {
         $va=$a['time']->value(); 
         $vb=$b['time']->value();
         if ($va==$vb){
-            return 0;
+            return $b['hash'] <=> $a['hash'];
         } else if ($va>$vb) {
             return -1;
         } else {
