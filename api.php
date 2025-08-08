@@ -26,6 +26,9 @@ if(isset($_REQUEST['balance'])){
 } else if(isset($_REQUEST['hash'])){
     header('Content-Type: application/json');
     echo getTransaction($_REQUEST['hash'],$gethRPC);
+} else if(isset($_REQUEST['batch'])){
+    header('Content-Type: application/json');
+    echo getBatchEthCallAt($_REQUEST['batch'],$gethRPC);
 } else {
     header('Content-Type: application/json');
     echo blockNumber($gethRPC);
@@ -694,4 +697,43 @@ function bchexdec($hex)
     }
     return $dec;
 }
+
+function getBatchEthCallAt($batch, $gethRPC)
+{
+    $requests = [];
+    foreach ($batch as $item) {
+        $tx = [
+            'to'   => $item['ethCall']['to'],
+            'data' => $item['ethCall']['data'],
+        ];
+        $requests[] = [
+            'method' => 'eth_call',
+            'params' => [$tx, $item['blockNb']],
+        ];
+    }
+
+    try {
+        $responses = $gethRPC->batch($requests);   // one HTTP round‑trip
+        // strip to the raw RPC results only
+        $out = array_map(
+            function($r) {
+                if (isset($r['error'])) {
+                    if (isset($r['error']['message'])) {
+                        return ['error' => ['msg' => $r['error']['message']]];
+                    }
+                    return ['error' => ['msg' => "unknown error"], 'data' => $r['error']];
+                }
+                if ($r['result'] == "0x") {
+                    return ['error' => ['msg' => "Invalid Geth Call"], 'data' => "InvalidCall"];
+                }
+                return ['data' => $r['result']];
+            },
+            $responses
+        );
+        return json_encode(['error' => false, 'data' => $out]);
+    } catch (Exception $e) {
+        return json_encode(['error' => true, 'msg' => $e->getMessage()]);
+    }
+}
+
 ?>

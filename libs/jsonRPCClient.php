@@ -162,6 +162,37 @@ class jsonRPCClient {
 			return true;
 		}
 	}
+
+
+    /** Send a JSON‑RPC batch and return decoded array of responses */
+    public function batch(array $calls): array
+    {
+        // inject IDs and jsonrpc version
+        foreach ($calls as $k => $c) {
+            $calls[$k] = [
+                'jsonrpc' => '2.0',
+                'method'  => $c['method'],
+                'params'  => $c['params'],
+                'id'      => $this->id++,
+            ];
+        }
+
+        $opts = [
+            'http' => [
+                'method'  => 'POST',
+                'header'  => 'Content-type: application/json',
+                'content' => json_encode($calls),
+            ],
+        ];
+        $ctx = stream_context_create($opts);
+        $raw = file_get_contents($this->url, false, $ctx);
+        if ($raw === false) {
+            throw new Exception('Unable to connect to ' . $this->url);
+        }
+
+        return json_decode($raw, true);   // array of rpc replies
+    }
+
 }
 
 
