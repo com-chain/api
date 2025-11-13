@@ -83,25 +83,27 @@ function DecryptMessage(string $privateKeyHex, string $encryptedHex): string {
 
 
 header('Access-Control-Allow-Origin: *');
-if (strlen($_POST['addr']) == 42) {
-	$addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_POST['addr']));
+if (strlen($_GET['addr']) == 42) {
+	$addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_GET['addr']));
 } else {
 	echo "Format of the Address not valid!";
 	exit;
 }
 
 $limit = 5;
-if (is_numeric($_POST['max_count'])){
-	$limit = $_POST['max_count'];
+if (is_numeric($_GET['max_count'])){
+	$limit = $_GET['max_count'];
 } 
 
 
-if (empty($_POST['msg_key'])) {
+$msg_key = getallheaders()['X-Comchain-Message-Key'];
+
+
+if (empty($msg_key)) {
 	echo "missing message key";
 	exit;
 }
 
-$msg_key=$_POST['msg_key'];
  
 $cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")
                 ->build();
