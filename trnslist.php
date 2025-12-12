@@ -1,114 +1,117 @@
 <?php
-header('Access-Control-Allow-Origin: *');
-if (strlen($_GET['addr']) == 42) {
-	$addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_GET['addr']));
-} else {
-	echo "Bye!";
+
+// Generator that yields rows across pages
+function paged_rows($page) {
+    while (true) {
+        foreach ($page as $row) {
+            yield $row;
+        }
+        if ($page->isLastPage()) break;
+        $page = $page->nextPage();
+    }
 }
 
-if (empty($_GET['count'])) {
-	$_GET['count'] = 5;
-}
+function get_transactions($session, $addr, $limit, $offset) {
+    $needed = $offset + $limit;
+    $page_size = 50;
+    $pending_cutoff = time() - 3600;
 
-if (empty($_GET['offset'])) {
-	$_GET['offset'] = 0;
-}
+    $iters = [
+        paged_rows($session->execute(
+            new Cassandra\SimpleStatement("SELECT * FROM testtransactions WHERE add1 = ? AND status = 0 ORDER BY time DESC"),
+            ['arguments' => [$addr], 'page_size' => $page_size]
+        )),
+        paged_rows($session->execute(
+            new Cassandra\SimpleStatement("SELECT * FROM testtransactions WHERE add1 = ? AND status = 1 AND time>=". $pending_cutoff ." ORDER BY time DESC"),
+            ['arguments' => [$addr], 'page_size' => $page_size]
+        )),
+    ];
 
-if (is_numeric($_GET['count'])){
-	$limit = $_GET['count'];
-} else {
-	$limit = 5;
-}
+    // Remove exhausted iterators
+    $iters = array_filter($iters, fn($it) => $it->valid());
 
-if (is_numeric($_GET['offset'])){
-	$offset = $_GET['offset'];
-} else {
-	$offset = 0;
-}
- 
-$cluster  = Cassandra::cluster('127.0.0.1') ->withCredentials("transactions_ro", "Public_transactions")
-                ->build();
-$keyspace  = 'comchain';
-$session  = $cluster->connect($keyspace);
+    $seen = [];
+    $txs = [];
+    $txs_count = 0;
 
-$counter = $offset + $limit;
+    // Merge all streams by time DESC, deduplicating
+    while ($iters) {
+        // Find iterator with highest time (most recent), hash as tiebreaker
+        $best_key = null;
+        $best_rank = null;
+        foreach ($iters as $key => $iter) {
+            $row = $iter->current();
+            $rank = [$row['time']->value(), $row['hash']];
+            if ($best_rank === null || $rank > $best_rank) {
+                $best_key = $key;
+                $best_rank = $rank;
+            }
+        }
 
-// commited trans
-$query = "select * from testtransactions WHERE add1 = ? AND status = 0 ORDER BY time DESC limit $counter;";
-$options = array('arguments' => array($addr));
-$full_set_row_com = $session->execute(new Cassandra\SimpleStatement($query), $options);
+        // Get row and advance iterator
+        $best_iter = $iters[$best_key];
+        $row = $best_iter->current();
+        $best_iter->next();
+        if (!$best_iter->valid()) {
+            unset($iters[$best_key]);
+        }
 
-$full_set_row = [];
-foreach ($full_set_row_com as $row) {
-    array_push($full_set_row, $row);
-}
-
-// Pending trans
-$query = "select * from testtransactions WHERE add1 = ? AND status = 1 and time>=".(time()-3600)." ORDER BY time DESC limit $counter;";
-
-$options = array('arguments' => array($addr));
-$full_set_row_pending = $session->execute(new Cassandra\SimpleStatement($query), $options);
-
-
-
-foreach ($full_set_row_pending as $row) {
-    $hash = $row['hash'];
-    $duplicate = false;
-    foreach ($full_set_row as $row_match){
-        if ($row_match['status']==0 && $row_match['hash']==$hash){
-            $duplicate = true;
+        // Deduplicate by hash
+        $hash = $row['hash'];
+        if (isset($seen[$hash]) && $seen[$hash] <= $row['status']) {
             continue;
         }
-    }
-    if (!$duplicate) {
-        array_unshift($full_set_row, $row);
-    } 
-}
+        $seen[$hash] = $row['status'];
 
-usort($full_set_row, function($a, $b) { 
-        $va=$a['time']->value(); 
-        $vb=$b['time']->value();
-        if ($va==$vb){
-            return $b['hash'] <=> $a['hash'];
-        } else if ($va>$vb) {
-            return -1;
+        $txs[] = $row;
+        if (++$txs_count >= $needed) break;
+    }
+
+    // Apply pagination
+    $txs = array_slice($txs, $offset);
+
+    // Format output
+    $output = [];
+    foreach ($txs as $row) {
+        if ($row['direction'] == 1) {
+            $row['addr_from'] = $row['add1'];
+            $row['addr_to'] = $row['add2'];
         } else {
-            return 1;
+            $row['addr_from'] = $row['add2'];
+            $row['addr_to'] = $row['add1'];
         }
-    });
-    
-$line_ct = 0;
-$jstring = [];
-foreach ($full_set_row as $row) {
-    if ($row['direction']==1){
-        $row['addr_from'] = $row['add1'];
-        $row['addr_to'] = $row['add2'];
-    } else {
-        $row['addr_from'] = $row['add2'];
-        $row['addr_to'] = $row['add1'];
-    }
-    
-    $row['time'] = $row['time']->value();
-    if(!is_null($row['receivedat'])) {
-        $row['receivedat'] = $row['receivedat']->value();
-    } else {
-        $row['receivedat'] =  $row['time'];    // for old transaction without receivedAt
-    }
-    
 
-    $jstring[$line_ct] = json_encode($row);
-    $line_ct++;
+        $row['time'] = $row['time']->value();
+        // for old transaction without receivedat
+        $row['receivedat'] = !is_null($row['receivedat'])
+            ? $row['receivedat']->value()
+            : $row['time'];
+
+        $output[] = json_encode($row);
+    }
+
+    return $output;
 }
 
-if (sizeof($jstring)<$offset) {
-    echo '[]';
-} else {
-    $jstring = array_slice($jstring, $offset);
-    if (sizeof($jstring)>$limit){
-       $jstring = array_slice($jstring, 0, $limit); 
+// Main entry point - only runs when executed directly
+if (realpath($_SERVER['SCRIPT_FILENAME']) === realpath(__FILE__)) {
+    header('Access-Control-Allow-Origin: *');
+
+    // Validate and parse input
+    if (strlen($_GET['addr'] ?? '') != 42) {
+        echo "Bye!";
+        exit;
     }
+    $addr = strtolower(preg_replace("/[^a-zA-Z0-9]+/", "", $_GET['addr']));
+    $limit = is_numeric($_GET['count'] ?? '') ? (int)$_GET['count'] : 5;
+    $offset = is_numeric($_GET['offset'] ?? '') ? (int)$_GET['offset'] : 0;
 
-    echo json_encode($jstring);  
+    // Connect to Cassandra
+    $cluster = Cassandra::cluster('127.0.0.1')
+        ->withCredentials("transactions_ro", "Public_transactions")
+        ->build();
+    $session = $cluster->connect('comchain');
+
+    echo json_encode(get_transactions($session, $addr, $limit, $offset));
 }
-
 ?>
