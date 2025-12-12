@@ -28,7 +28,9 @@ function get_transactions($session, $addr, $limit, $offset) {
     ];
 
     // Remove exhausted iterators
-    $iters = array_filter($iters, fn($it) => $it->valid());
+    $iters = array_filter($iters, function ($it) {
+        return $it->valid();
+    });
 
     $seen = [];
     $txs = [];
