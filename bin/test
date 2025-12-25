@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# Build and run tests inside Docker without installing PHP locally.
+# Usage: bin/test [-V PHP_VERSION] [--coverage] [-- <phpunit args>]
+# Example: bin/test -V 8.2 --coverage -- --testsuite trnslist
+
+set -euo pipefail
+
+TMP_CFG=""
+COVERAGE=false
+DOCKER_USER="$(id -u):$(id -g)"
+
+PHP_VERSION="8.3"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -V|--version)
+      PHP_VERSION="$2"
+      shift 2
+      ;;
+    --coverage)
+      COVERAGE=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      echo "Usage: $0 [-V PHP_VERSION] [-- <phpunit args>]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Determine matrix (phpunit + coverage driver) based on PHP_VERSION
+major="${PHP_VERSION%%.*}"
+minor_patch="${PHP_VERSION#*.}"
+minor="${minor_patch%%.*}"
+minor="${minor:-0}"
+
+PHPUNIT_URL=""
+COVERAGE_DRIVER="pcov"
+XDEBUG_VERSION=""
+PHPUNIT_MAJOR=12
+
+if [ "$major" -eq 7 ] && [ "$minor" -eq 0 ]; then
+  # PHP 7.0
+  PHPUNIT_URL="https://phar.phpunit.de/phpunit-6.5.14.phar"
+  COVERAGE_DRIVER="xdebug"
+  XDEBUG_VERSION="2.6.1"
+  PHPUNIT_MAJOR=6
+elif [ "$major" -eq 7 ] && [ "$minor" -le 2 ]; then
+  # PHP 7.1–7.2
+  PHPUNIT_URL="https://phar.phpunit.de/phpunit-7.5.20.phar"
+  COVERAGE_DRIVER="xdebug"
+  XDEBUG_VERSION="2.6.1"
+  PHPUNIT_MAJOR=7
+elif [ "$major" -eq 7 ]; then
+  # PHP 7.3–7.4
+  PHPUNIT_URL="https://phar.phpunit.de/phpunit-9.6.19.phar"
+  COVERAGE_DRIVER="pcov"
+  PHPUNIT_MAJOR=9
+elif [ "$major" -eq 8 ] && [ "$minor" -eq 0 ]; then
+  # PHP 8.0
+  PHPUNIT_URL="https://phar.phpunit.de/phpunit-9.6.19.phar"
+  COVERAGE_DRIVER="pcov"
+  PHPUNIT_MAJOR=9
+else
+  # PHP 8.1+
+  PHPUNIT_URL="https://phar.phpunit.de/phpunit-12.5.0.phar"
+  COVERAGE_DRIVER="pcov"
+  PHPUNIT_MAJOR=12
+fi
+
+IMAGE="comchain-phpunit:${PHP_VERSION}"
+
+DOCKERFILE_CONTENT=$(cat <<'EOF'
+ARG PHP_VERSION=8.3
+FROM php:${PHP_VERSION}-cli-alpine
+
+ARG PHPUNIT_URL=https://phar.phpunit.de/phpunit-12.5.0.phar
+ARG COVERAGE_DRIVER=pcov
+ARG XDEBUG_VERSION=2.6.1
+
+RUN set -e; \
+    apk add --no-cache curl git $PHPIZE_DEPS; \
+    if [ "$COVERAGE_DRIVER" = "pcov" ]; then \
+        pecl install pcov && docker-php-ext-enable pcov && \
+        { echo "pcov.enabled=1"; echo "pcov.directory=/app"; echo "pcov.exclude=#/app/vendor#"; } > /usr/local/etc/php/conf.d/coverage.ini; \
+    else \
+        pecl install xdebug-${XDEBUG_VERSION}; \
+        docker-php-ext-enable xdebug; \
+        { echo "xdebug.default_enable=1"; echo "xdebug.coverage_enable=1"; } > /usr/local/etc/php/conf.d/coverage.ini; \
+    fi; \
+    apk del $PHPIZE_DEPS; \
+    curl -Ls ${PHPUNIT_URL} -o /usr/local/bin/phpunit; \
+    chmod +x /usr/local/bin/phpunit
+
+WORKDIR /app
+CMD ["phpunit"]
+EOF
+)
+
+echo "Building image ${IMAGE} (PHP ${PHP_VERSION})..."
+echo "${DOCKERFILE_CONTENT}" | docker build \
+  --build-arg PHP_VERSION="${PHP_VERSION}" \
+  --build-arg PHPUNIT_URL="${PHPUNIT_URL}" \
+  --build-arg COVERAGE_DRIVER="${COVERAGE_DRIVER}" \
+  --build-arg XDEBUG_VERSION="${XDEBUG_VERSION}" \
+  -t "${IMAGE}" -f - .
+
+# Generate phpunit configuration tailored to version (written to a temp file)
+TMP_CFG="$(mktemp /tmp/phpunit.XXXXXX.xml)"
+trap 'rm -f "$TMP_CFG"' EXIT
+
+COVERAGE_XML=""
+if $COVERAGE; then
+  if [ "${PHPUNIT_MAJOR}" -lt 9 ]; then
+    COVERAGE_XML="  <filter>
+    <whitelist processUncoveredFilesFromWhitelist=\"true\">
+      <file>/app/trnslist.php</file>
+    </whitelist>
+  </filter>"
+  elif [ "${PHPUNIT_MAJOR}" -lt 10 ]; then
+    COVERAGE_XML="  <coverage>
+    <include>
+      <file>/app/trnslist.php</file>
+    </include>
+  </coverage>"
+  else
+    COVERAGE_XML="  <source>
+    <include>
+      <file>/app/trnslist.php</file>
+    </include>
+  </source>"
+  fi
+fi
+
+cat > "$TMP_CFG" <<CFG
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit colors="true" bootstrap="/app/tests/bootstrap.php">
+  <testsuites>
+    <testsuite name="trnslist">
+      <file>/app/tests/trnslistTest.php</file>
+    </testsuite>
+  </testsuites>
+${COVERAGE_XML}
+</phpunit>
+CFG
+
+echo "Running phpunit in ${IMAGE}..."
+PHPUNIT_OPTS=()
+if $COVERAGE; then
+  COVERAGE_DIR="$(pwd)/.coverage-html"
+  rm -rf "${COVERAGE_DIR}"
+  mkdir -p "${COVERAGE_DIR}"
+  chmod 777 "${COVERAGE_DIR}"
+  if [ "${PHPUNIT_MAJOR}" -lt 10 ]; then
+    PHPUNIT_OPTS+=(--coverage-html "${COVERAGE_DIR}" --coverage-text)
+  else
+    PHPUNIT_OPTS+=(--coverage-html "${COVERAGE_DIR}" --coverage-filter /app/trnslist.php --coverage-text)
+  fi
+  echo "Coverage output: ${COVERAGE_DIR}"
+fi
+
+DOCKER_COVERAGE_MOUNT=()
+if $COVERAGE; then
+  DOCKER_COVERAGE_MOUNT=(-v "${COVERAGE_DIR}:${COVERAGE_DIR}")
+fi
+
+if [ "$major" -ge 8 ]; then
+  # Suppress return-type deprecations from legacy mocks on PHP 8+
+  docker run --rm --user "${DOCKER_USER}" -v "$PWD":/app -v "$TMP_CFG":/tmp/phpunit.xml "${DOCKER_COVERAGE_MOUNT[@]}" "${IMAGE}" php -d error_reporting=8191 /usr/local/bin/phpunit -c /tmp/phpunit.xml "${PHPUNIT_OPTS[@]}" "$@"
+else
+  docker run --rm --user "${DOCKER_USER}" -v "$PWD":/app -v "$TMP_CFG":/tmp/phpunit.xml "${DOCKER_COVERAGE_MOUNT[@]}" "${IMAGE}" phpunit -c /tmp/phpunit.xml "${PHPUNIT_OPTS[@]}" "$@"
+fi
+
+if $COVERAGE; then
+  LINK="file://${COVERAGE_DIR}/index.html"
+  printf 'HTML Coverage report generated: \e]8;;%s\e\\./coverage-html\e]8;;\e\\\n' "$LINK"
+fi
